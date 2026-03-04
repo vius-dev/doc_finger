@@ -239,6 +239,8 @@ export async function revokeApiKey(keyId: string): Promise<void> {
 
 // ============ Institutions ============
 
+// ============ Institutions ============
+
 export interface Institution {
     id: string;
     institution_code: string;
@@ -288,4 +290,42 @@ export async function applyInstitution(body: {
     registration_number?: string;
 }): Promise<{ id: string; institution_code: string; status: string }> {
     return request('institutions', '/public/apply', { method: 'POST', body, auth: false });
+}
+
+// ============ Document Templates ============
+
+export interface DocumentTemplate {
+    id: string;
+    institution_id: string;
+    name: string;
+    description?: string;
+    document_type: string;
+    document_subtype?: string;
+    metadata_schema: any[];
+    nomenclature_config: Record<string, any>;
+    default_expiry_days?: number;
+    grace_period_days?: number;
+    theme_config: Record<string, any>;
+    is_active: boolean;
+    created_at: string;
+}
+
+export async function getTemplates(): Promise<DocumentTemplate[]> {
+    return request('institutions', '/templates');
+}
+
+export async function getTemplate(id: string): Promise<DocumentTemplate> {
+    return request('institutions', `/templates/${id}`);
+}
+
+export async function createTemplate(body: Partial<DocumentTemplate>): Promise<DocumentTemplate> {
+    return request('institutions', '/templates', { method: 'POST', body });
+}
+
+export async function updateTemplate(id: string, body: Partial<DocumentTemplate>): Promise<DocumentTemplate> {
+    return request('institutions', `/templates/${id}`, { method: 'PATCH', body });
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+    return request('institutions', `/templates/${id}`, { method: 'DELETE' });
 }

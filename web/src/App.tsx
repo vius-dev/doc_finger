@@ -8,6 +8,7 @@ import Register from './pages/dashboard/Register';
 import Analytics from './pages/dashboard/Analytics';
 import Keys from './pages/dashboard/Keys';
 import Settings from './pages/dashboard/Settings';
+import ManageTemplates from './pages/dashboard/ManageTemplates';
 import BulkUpload from './pages/dashboard/BulkUpload';
 import Verify from './pages/public/Verify';
 import Pricing from './pages/public/Pricing';
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="keys" element={<Keys />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="templates" element={<ManageTemplates />} />
             <Route path="bulk-upload" element={<BulkUpload />} />
           </Route>
 

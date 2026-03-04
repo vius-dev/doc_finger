@@ -23,6 +23,8 @@ const ID_TYPES = [
 export default function Register() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [templates, setTemplates] = useState<api.DocumentTemplate[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<api.DocumentTemplate | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<{
         fingerprint_id: string;
@@ -43,7 +45,32 @@ export default function Register() {
         document_number: '',
         issue_date: new Date().toISOString().split('T')[0],
         expiry_date: '',
+        template_id: '',
     });
+
+    useEffect(() => {
+        loadTemplates();
+    }, []);
+
+    async function loadTemplates() {
+        try {
+            const data = await api.getTemplates();
+            setTemplates(data);
+        } catch (err) {
+            console.error('Failed to load templates', err);
+        }
+    }
+
+    const handleTemplateChange = (templateId: string) => {
+        const template = templates.find(t => t.id === templateId) || null;
+        setSelectedTemplate(template);
+        setForm(f => ({
+            ...f,
+            template_id: templateId,
+            document_type: template?.document_type || f.document_type,
+            // If template has nomenclature or lifecycle defaults, we could apply them here
+        }));
+    };
 
     const updateField = (field: string, value: string) => {
         setForm((f) => ({ ...f, [field]: value }));
@@ -56,7 +83,7 @@ export default function Register() {
         setError(null);
 
         try {
-            const result = await registerDocument({
+            const result = await api.registerDocument({
                 recipient_name: form.recipient_name,
                 document_type: form.document_type,
                 issue_date: isAutoDates ? undefined : form.issue_date,
@@ -66,7 +93,8 @@ export default function Register() {
                 recipient_phone: form.recipient_phone || undefined,
                 recipient_id_type: form.recipient_id_type || undefined,
                 recipient_id_value: form.recipient_id_value || undefined,
-            });
+                template_id: form.template_id || undefined,
+            } as any);
             setSuccess(result);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (err) {
@@ -177,6 +205,23 @@ export default function Register() {
                             </div>
 
                             <div className="space-y-4">
+                                {templates.length > 0 && (
+                                    <div className="form-group">
+                                        <label className="form-label">Issuance Template</label>
+                                        <select
+                                            className="select"
+                                            value={form.template_id}
+                                            onChange={(e) => handleTemplateChange(e.target.value)}
+                                            style={{ borderColor: form.template_id ? 'var(--color-accent)' : undefined }}
+                                        >
+                                            <option value="">Start from Scratch (Manual)</option>
+                                            {templates.map(t => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div className="form-group">
                                     <label className="form-label">Document Classification *</label>
                                     <select className="select" required value={form.document_type} onChange={(e) => updateField('document_type', e.target.value)}>

@@ -47,6 +47,18 @@ Deno.serve(async (req: Request) => {
             return await updateInstitution(req, id);
         }
 
+        // Document Template Endpoints
+        if (path === "/templates") {
+            if (req.method === "GET") return await listTemplates(req);
+            if (req.method === "POST") return await createTemplate(req);
+        }
+        if (path.startsWith("/templates/")) {
+            const id = path.replace("/templates/", "");
+            if (req.method === "GET") return await getTemplate(req, id);
+            if (req.method === "PATCH") return await updateTemplate(req, id);
+            if (req.method === "DELETE") return await deleteTemplate(req, id);
+        }
+
         return errorResponse("NOT_FOUND", "Endpoint not found", 404);
     } catch (err) {
         console.error("Institution service error:", err);
@@ -416,4 +428,107 @@ async function applyInstitution(req: Request): Promise<Response> {
         undefined,
         201
     );
+}
+
+// ============ Document Templates ============
+
+async function listTemplates(req: Request): Promise<Response> {
+    const { error: authError, context } = await authenticateRequest(req);
+    if (authError || !context) return authError!;
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+        .from("document_templates")
+        .select("*")
+        .eq("institution_id", context.institutionId)
+        .order("created_at", { ascending: false });
+
+    if (error) return errorResponse("INTERNAL_ERROR", "Failed to list templates", 500);
+    return successResponse(data);
+}
+
+async function createTemplate(req: Request): Promise<Response> {
+    const { error: authError, context } = await authenticateRequest(req);
+    if (authError || !context) return authError!;
+
+    const body = await req.json();
+    if (!body.name || !body.document_type) {
+        return errorResponse("VALIDATION_ERROR", "Name and document_type are required", 400);
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+        .from("document_templates")
+        .insert({
+            institution_id: context.institutionId,
+            name: body.name,
+            description: body.description,
+            document_type: body.document_type,
+            document_subtype: body.document_subtype,
+            metadata_schema: body.metadata_schema ?? [],
+            nomenclature_config: body.nomenclature_config ?? {},
+            default_expiry_days: body.default_expiry_days,
+            grace_period_days: body.grace_period_days,
+            theme_config: body.theme_config ?? {},
+            created_by: context.apiKeyId,
+        })
+        .select()
+        .single();
+
+    if (error) return errorResponse("INTERNAL_ERROR", "Failed to create template", 500);
+    return successResponse(data, undefined, 201);
+}
+
+async function getTemplate(req: Request, id: string): Promise<Response> {
+    const { error: authError, context } = await authenticateRequest(req);
+    if (authError || !context) return authError!;
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+        .from("document_templates")
+        .select("*")
+        .eq("id", id)
+        .eq("institution_id", context.institutionId)
+        .single();
+
+    if (error || !data) return errorResponse("NOT_FOUND", "Template not found", 404);
+    return successResponse(data);
+}
+
+async function updateTemplate(req: Request, id: string): Promise<Response> {
+    const { error: authError, context } = await authenticateRequest(req);
+    if (authError || !context) return authError!;
+
+    const body = await req.json();
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+        .from("document_templates")
+        .update({
+            ...body,
+            institution_id: context.institutionId, // Ensure it stays locked
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .eq("institution_id", context.institutionId)
+        .select()
+        .single();
+
+    if (error) return errorResponse("INTERNAL_ERROR", "Failed to update template", 500);
+    return successResponse(data);
+}
+
+async function deleteTemplate(req: Request, id: string): Promise<Response> {
+    const { error: authError, context } = await authenticateRequest(req);
+    if (authError || !context) return authError!;
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+        .from("document_templates")
+        .delete()
+        .eq("id", id)
+        .eq("institution_id", context.institutionId);
+
+    if (error) return errorResponse("INTERNAL_ERROR", "Failed to delete template", 500);
+    return successResponse({ deleted: true });
 }

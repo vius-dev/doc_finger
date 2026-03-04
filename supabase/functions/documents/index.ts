@@ -138,29 +138,55 @@ async function registerDocument(req: Request): Promise<Response> {
     // Generate fingerprint ID. Document hash will be generated after ID/Dates are finalized.
     const fingerprintId = generateFingerprintId(institution.institution_code);
 
-    // Auto-generate Document Number if missing
+    // Template Lookup
+    let template = null;
+    if (body.template_id) {
+        const { data: tData, error: tError } = await supabase
+            .from("document_templates")
+            .select("*")
+            .eq("id", body.template_id)
+            .eq("institution_id", context.institutionId)
+            .single();
+        if (tError) {
+            return errorResponse("NOT_FOUND", "Template not found or inaccessible", 404);
+        }
+        template = tData;
+    }
+
+    // Auto-generate Document Number if missing or if template mandates it
     let docNumber = body.document_number;
-    if (!docNumber) {
+    const forceAutoNumber = template?.nomenclature_config?.force_auto === true;
+
+    if (!docNumber || forceAutoNumber) {
         const { data: seq, error: seqError } = await supabase.rpc("get_next_document_number", {
             p_institution_id: context.institutionId,
         });
+
         if (seqError) {
             console.error("Sequence error:", seqError);
-            // Fallback to timestamp based if sequence function fails
             docNumber = `${institution.institution_code.toUpperCase()}-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
         } else {
-            docNumber = `${institution.institution_code.toUpperCase()}-${new Date().getFullYear()}-${seq.toString().padStart(6, '0')}`;
+            const prefix = template?.nomenclature_config?.prefix || `${institution.institution_code.toUpperCase()}-`;
+            const yearStr = template?.nomenclature_config?.include_year !== false ? `${new Date().getFullYear()}-` : '';
+            const padding = template?.nomenclature_config?.padding || 6;
+            docNumber = `${prefix}${yearStr}${seq.toString().padStart(padding, '0')}`;
         }
     }
 
-    // Default dates
+    // Default dates & Lifecycle
     const issueDate = body.issue_date || new Date().toISOString().split("T")[0];
-    const expiryDate = body.expiry_date || null; // Trigger handles default if null
+    let expiryDate = body.expiry_date || null;
+
+    if (!expiryDate && template?.default_expiry_days) {
+        const date = new Date(issueDate);
+        date.setDate(date.getDate() + template.default_expiry_days);
+        expiryDate = date.toISOString().split("T")[0];
+    }
 
     // Generate document hash
     const documentHash = await generateDocumentHash({
         recipient_name: body.recipient_name,
-        document_type: body.document_type,
+        document_type: template?.document_type || body.document_type,
         document_number: docNumber,
         issue_date: issueDate,
         metadata: body.metadata ?? {},
@@ -177,17 +203,18 @@ async function registerDocument(req: Request): Promise<Response> {
     const recipientIdentifierSource = body.recipient_id_value || body.recipient_email || body.recipient_name;
     const recipientIdentifierHash = await sha256(recipientIdentifierSource);
 
-    // Insert document — the set_default_expiry trigger handles expiry_date
+    // Insert document — the set_default_expiry trigger handles expiry_date if still null
     const { data, error } = await supabase
         .from("documents")
         .insert({
             fingerprint_id: fingerprintId,
             sha256_hash: documentHash,
             institution_id: context.institutionId,
+            template_id: template?.id || null,
             issuing_department: body.issuing_department ?? null,
             issuer_user_id: body.issuer_user_id ?? null,
-            document_type: body.document_type,
-            document_subtype: body.document_subtype ?? null,
+            document_type: template?.document_type || body.document_type,
+            document_subtype: template?.document_subtype || body.document_subtype || null,
             document_number: docNumber,
             recipient_name: body.recipient_name,
             recipient_identifier_hash: recipientIdentifierHash,
