@@ -152,9 +152,13 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
 export async function registerDocument(body: {
     recipient_name: string;
     document_type: string;
-    issue_date: string;
+    issue_date?: string;
     document_number?: string;
     expiry_date?: string;
+    recipient_email?: string;
+    recipient_phone?: string;
+    recipient_id_type?: string;
+    recipient_id_value?: string;
     metadata?: Record<string, unknown>;
 }): Promise<{
     fingerprint_id: string;

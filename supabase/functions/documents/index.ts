@@ -135,15 +135,47 @@ async function registerDocument(req: Request): Promise<Response> {
         );
     }
 
-    // Generate fingerprint ID and document hash
+    // Generate fingerprint ID. Document hash will be generated after ID/Dates are finalized.
     const fingerprintId = generateFingerprintId(institution.institution_code);
+
+    // Auto-generate Document Number if missing
+    let docNumber = body.document_number;
+    if (!docNumber) {
+        const { data: seq, error: seqError } = await supabase.rpc("get_next_document_number", {
+            p_institution_id: context.institutionId,
+        });
+        if (seqError) {
+            console.error("Sequence error:", seqError);
+            // Fallback to timestamp based if sequence function fails
+            docNumber = `${institution.institution_code.toUpperCase()}-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+        } else {
+            docNumber = `${institution.institution_code.toUpperCase()}-${new Date().getFullYear()}-${seq.toString().padStart(6, '0')}`;
+        }
+    }
+
+    // Default dates
+    const issueDate = body.issue_date || new Date().toISOString().split("T")[0];
+    const expiryDate = body.expiry_date || null; // Trigger handles default if null
+
+    // Generate document hash
     const documentHash = await generateDocumentHash(
         body.recipient_name,
         body.document_type,
-        body.document_number ?? null,
-        body.issue_date,
+        docNumber,
+        issueDate,
         body.metadata ?? {}
     );
+
+    // Extract recipient identity for hashing and storage
+    const recipientIdentity = {
+        email: body.recipient_email || null,
+        phone: body.recipient_phone || null,
+        id_type: body.recipient_id_type || null,
+        id_value: body.recipient_id_value || null,
+    };
+
+    const recipientIdentifierSource = body.recipient_id_value || body.recipient_email || body.recipient_name;
+    const recipientIdentifierHash = await sha256(recipientIdentifierSource);
 
     // Insert document — the set_default_expiry trigger handles expiry_date
     const { data, error } = await supabase
@@ -156,13 +188,12 @@ async function registerDocument(req: Request): Promise<Response> {
             issuer_user_id: body.issuer_user_id ?? null,
             document_type: body.document_type,
             document_subtype: body.document_subtype ?? null,
-            document_number: body.document_number ?? null,
+            document_number: docNumber,
             recipient_name: body.recipient_name,
-            recipient_identifier_hash: body.recipient_identifier
-                ? await sha256(body.recipient_identifier)
-                : null,
-            issue_date: body.issue_date,
-            expiry_date: body.expiry_date ?? null, // null triggers the default
+            recipient_identifier_hash: recipientIdentifierHash,
+            recipient_additional: recipientIdentity,
+            issue_date: issueDate,
+            expiry_date: expiryDate,
             effective_date: body.effective_date ?? null,
             document_metadata: body.metadata ?? {},
             public_display: body.public_display ?? null,
