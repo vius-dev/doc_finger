@@ -55,25 +55,25 @@ function generateFingerprintId(institutionCode: string): string {
 }
 
 /**
- * Generate a SHA-256 hash from document content and metadata.
+ * Generate a deterministic hash for a document.
+ * This hash must be reproducible from the document attributes alone.
  */
-async function generateDocumentHash(
-    recipientName: string,
-    documentType: string,
-    documentNumber: string | null,
-    issueDate: string,
-    metadata: Record<string, unknown>
-): Promise<string> {
-    const hashInput = JSON.stringify({
-        recipient: recipientName,
-        type: documentType,
-        number: documentNumber ?? "",
-        issue_date: issueDate,
-        metadata,
-        timestamp: Date.now(),
+async function generateDocumentHash(payload: {
+    document_type: string;
+    document_number?: string;
+    recipient_name: string;
+    issue_date: string;
+    metadata: Record<string, any>;
+}): Promise<string> {
+    const dataString = JSON.stringify({
+        t: payload.document_type,
+        n: payload.document_number || "",
+        r: payload.recipient_name,
+        d: payload.issue_date,
+        m: payload.metadata,
     });
 
-    return sha256(hashInput);
+    return await sha256(dataString);
 }
 
 /**
@@ -158,13 +158,13 @@ async function registerDocument(req: Request): Promise<Response> {
     const expiryDate = body.expiry_date || null; // Trigger handles default if null
 
     // Generate document hash
-    const documentHash = await generateDocumentHash(
-        body.recipient_name,
-        body.document_type,
-        docNumber,
-        issueDate,
-        body.metadata ?? {}
-    );
+    const documentHash = await generateDocumentHash({
+        recipient_name: body.recipient_name,
+        document_type: body.document_type,
+        document_number: docNumber,
+        issue_date: issueDate,
+        metadata: body.metadata ?? {},
+    });
 
     // Extract recipient identity for hashing and storage
     const recipientIdentity = {

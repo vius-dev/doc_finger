@@ -154,6 +154,20 @@ export default function Verify() {
                                                     }
                                                 </div>
                                             </div>
+
+                                            {/* Dynamic Verified Metadata */}
+                                            {result.document && Object.entries(result.document).map(([key, value]) => {
+                                                // Identify custom keys that aren't the standard ones we already rendered
+                                                const standardKeys = ['type', 'subtype', 'recipient_name', 'issue_date', 'expiry_date'];
+                                                if (standardKeys.includes(key) || typeof value === 'object') return null;
+
+                                                return (
+                                                    <div className="cert-meta-item" key={key}>
+                                                        <div className="cert-meta-label">{key.replace(/_/g, ' ')}</div>
+                                                        <div className="cert-meta-value">{String(value)}</div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 

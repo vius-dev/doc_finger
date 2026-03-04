@@ -48,24 +48,38 @@ async function verifySingle(
 ): Promise<Response> {
     const startTime = Date.now();
     const supabase = getSupabaseAdmin();
-
     const normalizedId = fingerprintId.toUpperCase();
 
-    // Look up the document
+    // 1. Normalize execution time by fetching institution code from ID before document check
+    // This masks whether the document exists or not via timing analysis of the DB call
+    const institutionCode = normalizedId.split("-")[0];
+    let institutionInfo = null;
+
+    if (institutionCode) {
+        const { data: inst } = await supabase
+            .from("institutions")
+            .select("institution_code, legal_name, trading_name, institution_type, country_code, verification_level, status")
+            .eq("institution_code", institutionCode)
+            .eq("status", "active")
+            .maybeSingle();
+        institutionInfo = inst;
+    }
+
+    // 2. Look up the document
     const { data: doc, error } = await supabase
         .from("documents")
-        .select(
-            `id, fingerprint_id, document_type, document_subtype,
-       recipient_name, issue_date, expiry_date, status,
-       institution_id, public_display, created_at`
-        )
+        .select(`
+            id, fingerprint_id, document_type, document_subtype,
+            recipient_name, issue_date, expiry_date, status,
+            institution_id, public_display, created_at
+        `)
         .eq("fingerprint_id", normalizedId)
-        .single();
+        .maybeSingle();
 
     const responseTimeMs = Date.now() - startTime;
 
+    // Handle Not Found
     if (error || !doc) {
-        // Log failed verification attempt
         await logVerification(supabase, {
             fingerprintId: normalizedId,
             documentId: null,
@@ -80,25 +94,23 @@ async function verifySingle(
         return successResponse({
             verified: false,
             fingerprint_id: normalizedId,
-            message: "No document found with this fingerprint ID",
             checked_at: new Date().toISOString(),
-            response_time_ms: responseTimeMs,
+            issuer: institutionInfo ? {
+                code: institutionInfo.institution_code,
+                name: institutionInfo.legal_name,
+                trading_name: institutionInfo.trading_name,
+                type: institutionInfo.institution_type,
+                country: institutionInfo.country_code,
+                verification_level: institutionInfo.verification_level,
+            } : null,
+            status: "not_found",
+            message: "This fingerprint could not be found in our registry."
         });
     }
 
-    // Get institution public info
-    const { data: institution } = await supabase
-        .from("institutions")
-        .select(
-            "institution_code, legal_name, trading_name, institution_type, country_code, verification_level"
-        )
-        .eq("id", doc.institution_id)
-        .single();
-
-    // Determine verification result
+    // 3. Determine verification result
     const isActive = doc.status === "active";
-    const isExpired =
-        doc.expiry_date && new Date(doc.expiry_date) < new Date();
+    const isExpired = doc.expiry_date && new Date(doc.expiry_date) < new Date();
     const verified = isActive && !isExpired;
 
     let statusMessage: string;
@@ -112,7 +124,7 @@ async function verifySingle(
         statusMessage = "This document is not active";
     }
 
-    // Log successful verification attempt
+    // 4. Log successful (or active but unverified) attempt
     await logVerification(supabase, {
         fingerprintId: normalizedId,
         documentId: doc.id,
@@ -137,16 +149,14 @@ async function verifySingle(
             expiry_date: doc.expiry_date,
             ...(doc.public_display ?? {}),
         },
-        issuer: institution
-            ? {
-                code: institution.institution_code,
-                name: institution.legal_name,
-                trading_name: institution.trading_name,
-                type: institution.institution_type,
-                country: institution.country_code,
-                verification_level: institution.verification_level,
-            }
-            : null,
+        issuer: institutionInfo ? {
+            code: institutionInfo.institution_code,
+            name: institutionInfo.legal_name,
+            trading_name: institutionInfo.trading_name,
+            type: institutionInfo.institution_type,
+            country: institutionInfo.country_code,
+            verification_level: institutionInfo.verification_level,
+        } : null,
         checked_at: new Date().toISOString(),
         response_time_ms: Date.now() - startTime,
     });

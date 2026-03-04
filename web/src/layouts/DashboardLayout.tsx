@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,6 +13,7 @@ const navItems = [
 
 export default function DashboardLayout() {
   const { isAuthenticated, isLoading, institution, logout } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -25,10 +27,37 @@ export default function DashboardLayout() {
     return <Navigate to="/" replace />;
   }
 
+  const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
   return (
-    <div className="dashboard">
+    <div className={`dashboard ${isMobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      {/* Mobile Header Overlay */}
+      <div className="mobile-header">
+        <div className="sidebar-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          </svg>
+          <span>DocFingerprint</span>
+        </div>
+        <button className="btn btn-ghost" onClick={toggleMobileMenu}>
+          {isMobileMenuOpen ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Sidebar Overlay for Mobile */}
+      {isMobileMenuOpen && <div className="sidebar-overlay" onClick={closeMobileMenu} />}
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isMobileMenuOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -46,6 +75,7 @@ export default function DashboardLayout() {
               key={item.path}
               to={item.path}
               end={item.path === '/dashboard'}
+              onClick={closeMobileMenu}
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
               }
@@ -84,6 +114,26 @@ export default function DashboardLayout() {
         .dashboard {
           display: flex;
           min-height: 100vh;
+          position: relative;
+        }
+        .mobile-header {
+          display: none;
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          height: 60px;
+          background: var(--color-bg-sidebar);
+          border-bottom: 1px solid var(--color-border);
+          padding: 0 var(--space-4);
+          z-index: 100;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .sidebar-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.5);
+          backdrop-filter: blur(4px);
+          z-index: 40;
         }
         .sidebar {
           width: var(--sidebar-width);
@@ -96,6 +146,7 @@ export default function DashboardLayout() {
           left: 0;
           bottom: 0;
           z-index: 50;
+          transition: transform var(--transition-base);
         }
         .sidebar-header {
           padding: var(--space-4) var(--space-5);
@@ -166,6 +217,27 @@ export default function DashboardLayout() {
           margin-left: var(--sidebar-width);
           padding: var(--space-8);
           min-height: 100vh;
+        }
+
+        @media (max-width: 1024px) {
+          :root { --sidebar-width: 240px; }
+        }
+
+        @media (max-width: 768px) {
+          .mobile-header { display: flex; }
+          .sidebar {
+            transform: translateX(-100%);
+            width: 280px;
+          }
+          .sidebar-open {
+            transform: translateX(0);
+          }
+          .main-content {
+            margin-left: 0;
+            padding-top: calc(60px + var(--space-6));
+            padding-left: var(--space-4);
+            padding-right: var(--space-4);
+          }
         }
       `}</style>
     </div>
