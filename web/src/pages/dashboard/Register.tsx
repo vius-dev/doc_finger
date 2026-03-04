@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { registerDocument } from '../../services/api';
+import * as api from '../../services/api';
 
 const DOCUMENT_TYPES = [
     { value: 'degree_certificate', label: 'Degree Certificate' },
@@ -24,7 +24,6 @@ export default function Register() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [templates, setTemplates] = useState<api.DocumentTemplate[]>([]);
-    const [selectedTemplate, setSelectedTemplate] = useState<api.DocumentTemplate | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<{
         fingerprint_id: string;
@@ -63,7 +62,6 @@ export default function Register() {
 
     const handleTemplateChange = (templateId: string) => {
         const template = templates.find(t => t.id === templateId) || null;
-        setSelectedTemplate(template);
         setForm(f => ({
             ...f,
             template_id: templateId,
@@ -77,7 +75,7 @@ export default function Register() {
         setError(null);
     };
 
-    async function handleSubmit(e: FormEvent) {
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setLoading(true);
         setError(null);

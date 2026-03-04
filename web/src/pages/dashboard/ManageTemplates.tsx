@@ -49,7 +49,7 @@ export default function ManageTemplates() {
         }
     }
 
-    async function handleSubmit(e: React.FormEvent) {
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         try {
             const payload = {
