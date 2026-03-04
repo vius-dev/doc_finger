@@ -2,6 +2,7 @@
 // This is the data access layer; no UI or business logic here
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://tzulhmrmscedulpldvnk.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''; // Publishable key
 const FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
 let _apiKey: string | null = null;
@@ -50,6 +51,11 @@ async function request<T>(
         'Content-Type': 'application/json',
     };
 
+    // Always include apikey (publishable key) for Supabase Gateway
+    if (SUPABASE_ANON_KEY) {
+        headers['apikey'] = SUPABASE_ANON_KEY;
+    }
+
     const messagePath = `/${functionName}${path}`;
 
     if (auth && apiKey) {
@@ -60,6 +66,9 @@ async function request<T>(
         const bodyStr = body ? JSON.stringify(body) : '';
         const message = `${timestamp}\n${method}\n${messagePath}\n${method !== 'GET' ? bodyStr : ''}`;
         headers['X-Signature'] = await generateHmacSignature(apiKey, message);
+    } else if (SUPABASE_ANON_KEY) {
+        // Use publishable key as fallback for public routes
+        headers['Authorization'] = `Bearer ${SUPABASE_ANON_KEY}`;
     }
 
     const url = `${FUNCTIONS_URL}${messagePath}`;
