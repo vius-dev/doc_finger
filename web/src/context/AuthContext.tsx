@@ -14,6 +14,7 @@ interface AuthState {
 interface AuthContextType extends AuthState {
     login: (apiKey: string) => Promise<void>;
     logout: () => void;
+    refreshInstitution: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -90,8 +91,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
     }
 
+    async function refreshInstitution() {
+        if (!state.institutionId) return;
+        try {
+            const institution = await getInstitution(state.institutionId);
+            setState((s) => ({ ...s, institution }));
+        } catch (err) {
+            console.error('Failed to refresh institution:', err);
+        }
+    }
+
     return (
-        <AuthContext.Provider value={{ ...state, login, logout }}>
+        <AuthContext.Provider value={{ ...state, login, logout, refreshInstitution }}>
             {children}
         </AuthContext.Provider>
     );

@@ -233,13 +233,24 @@ export interface Institution {
     trading_name?: string;
     institution_type: string;
     country_code: string;
+    registration_number?: string;
     verification_level: number;
     status: string;
     primary_email: string;
     technical_email?: string;
-    billing_plan: string;
-    current_month_usage: number;
+    billing_email?: string;
+    phone_number?: string;
+    website?: string;
+    physical_address?: string;
+    postal_address?: string;
+    allowed_document_types: string[];
+    custom_document_types?: Record<string, any>;
     monthly_document_quota?: number;
+    annual_document_quota?: number;
+    current_month_usage: number;
+    billing_plan: string;
+    billing_status?: string;
+    metadata?: Record<string, any>;
 }
 
 export async function getInstitution(id: string): Promise<Institution> {
