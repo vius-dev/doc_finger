@@ -84,3 +84,4 @@ Icon
 *.db
 seed_output.json
 remote_schema.sql
+
