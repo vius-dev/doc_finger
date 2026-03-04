@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as api from '../../services/api';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { useExportPDF } from '../../hooks/useExportPDF';
 
 export default function DocumentDetails() {
     const { id } = useParams<{ id: string }>();
@@ -12,6 +11,7 @@ export default function DocumentDetails() {
     const [error, setError] = useState<string | null>(null);
     const printRef = useRef<HTMLDivElement>(null);
     const [revoking, setRevoking] = useState(false);
+    const { exportPDF, exporting } = useExportPDF();
 
     const fetchDoc = async () => {
         if (!id) return;
@@ -31,35 +31,7 @@ export default function DocumentDetails() {
         fetchDoc();
     }, [id]);
 
-    const handleExportPDF = async () => {
-        if (!printRef.current) return;
-        
-        try {
-            const canvas = await html2canvas(printRef.current, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
-            });
-            
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-            
-            const imgProps = pdf.getImageProperties(imgData);
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-            
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`Document-${doc.fingerprint_id}.pdf`);
-        } catch (err) {
-            console.error('PDF generation failed', err);
-            alert('Failed to generate PDF. You can try standard printing instead.');
-        }
-    };
+    // PDF Export handled by useExportPDF hook
 
     async function handleRevoke() {
         if (!doc) return;
@@ -160,11 +132,19 @@ export default function DocumentDetails() {
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
                             Preview Certificate
                         </button>
-                        <button className="btn btn-secondary flex items-center gap-2" onClick={handleExportPDF}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            Download PDF
+                        <button
+                            className="btn btn-secondary flex items-center gap-2"
+                            onClick={() => exportPDF(printRef.current, { fileName: `Document-${doc.fingerprint_id}` })}
+                            disabled={exporting}
+                        >
+                            {exporting ? (
+                                <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                            ) : (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            )}
+                            {exporting ? 'Generating...' : 'Download PDF'}
                         </button>
                         <button className="btn btn-primary flex items-center gap-2" onClick={() => window.print()}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -440,13 +420,13 @@ export default function DocumentDetails() {
                 .print-report { display: none; }
 
                 @media print {
+                    @page { size: A4; margin: 15mm; }
                     .no-print { display: none !important; }
                     .print-report {
                         display: block !important;
                         background: #fff;
                         color: #000;
                         padding: 0;
-                        min-height: 100vh;
                         position: relative;
                         font-family: 'Inter', sans-serif;
                     }
@@ -474,7 +454,7 @@ export default function DocumentDetails() {
                     .report-title { font-size: 1.5rem; font-weight: 900; margin: 0; letter-spacing: -0.02em; }
                     .report-serial { font-family: monospace; font-size: 0.875rem; color: #444; }
                     
-                    .report-section { margin-bottom: 2.5rem; }
+                    .report-section { margin-bottom: 1.5rem; break-inside: avoid; }
                     .section-title {
                         font-size: 0.75rem;
                         font-weight: 900;
@@ -502,7 +482,7 @@ export default function DocumentDetails() {
                     .report-mono-box.small { font-size: 0.75rem; line-height: 1.5; word-break: break-all; }
                     
                     .report-footer {
-                        margin-top: 4rem;
+                        margin-top: 2rem;
                         display: flex;
                         justify-content: space-between;
                         align-items: flex-end;

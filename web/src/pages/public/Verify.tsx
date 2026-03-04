@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { verifyDocument, type VerificationResult } from '../../services/api';
+import { useExportPDF } from '../../hooks/useExportPDF';
 
 export default function Verify() {
     const { id } = useParams<{ id: string }>();
@@ -8,6 +9,8 @@ export default function Verify() {
     const [result, setResult] = useState<VerificationResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const certificateRef = useRef<HTMLDivElement>(null);
+    const { exportPDF, exporting } = useExportPDF();
 
     // Auto-verify if fingerprint is in URL
     useState(() => { if (id) handleVerify(id); });
@@ -84,111 +87,141 @@ export default function Verify() {
                                     </span>
                                 )}
                             </h2>
-                            <button className="btn btn-secondary flex items-center gap-2" onClick={() => window.print()}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
-                                Download Certificate
+                            <button
+                                className="btn btn-secondary flex items-center gap-2"
+                                onClick={() => exportPDF(certificateRef.current, { fileName: `Certificate-${result.fingerprint_id}` })}
+                                disabled={exporting}
+                            >
+                                {exporting ? (
+                                    <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                                ) : (
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+                                )}
+                                {exporting ? 'Generating...' : 'Download Certificate'}
                             </button>
                         </div>
 
-                        <div className="certificate-frame">
+                        <div
+                            ref={certificateRef}
+                            className={`certificate-frame ${result.template?.theme_config?.hide_default_border ? 'no-border' : ''}`}
+                            style={{
+                                borderColor: result.template?.theme_config?.accent_color || '#e2e8f0',
+                                position: 'relative'
+                            }}
+                        >
                             <div className="certificate-border">
-                                <div className="certificate-inner">
-                                    {/* Guilloche Pattern Background */}
-                                    <div className="certificate-guilloche" />
+                                <div className="certificate-inner" style={{
+                                    background: result.template?.theme_config?.background_url ? 'none' : 'ivory'
+                                }}>
+                                    {/* Background Image Layer */}
+                                    {result.template?.theme_config?.background_url && (
+                                        <img
+                                            src={result.template.theme_config.background_url}
+                                            alt="Certificate Background"
+                                            className="absolute inset-0 w-full h-full object-cover z-0"
+                                            crossOrigin="anonymous"
+                                        />
+                                    )}
 
-                                    {/* Header */}
-                                    <div className="certificate-header">
-                                        <div className="certificate-institution">
-                                            <div className="certificate-issuer-logo">
-                                                {result.issuer?.name.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div className="certificate-issuer-name">{result.issuer?.name}</div>
-                                                <div className="certificate-issuer-meta">Official Digital Evidence · {result.issuer?.country}</div>
-                                            </div>
-                                        </div>
-                                        <div className="certificate-seal">
-                                            <svg viewBox="0 0 100 100" className="w-24 h-24">
-                                                <circle cx="50" cy="50" r="45" fill="none" stroke="var(--color-accent)" strokeWidth="1" strokeDasharray="2 2" />
-                                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--color-accent)" strokeWidth="2" />
-                                                <path id="curve" d="M 20,50 a 30,30 0 1,1 60,0 a 30,30 0 1,1 -60,0" fill="transparent" />
-                                                <text className="text-[6px] uppercase tracking-[2px]" fill="var(--color-accent)">
-                                                    <textPath href="#curve" startOffset="50%" textAnchor="middle">
-                                                        Authentic Evidence · Secured by DocFinger ·
-                                                    </textPath>
-                                                </text>
-                                                {result.verified ? (
-                                                    <g transform="translate(35, 35) scale(1.2)">
-                                                        <path d="M15 3.5l-4 4-2-2" stroke="var(--color-accent)" strokeWidth="2" fill="none" />
-                                                    </g>
-                                                ) : (
-                                                    <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" fontSize="20" fill="var(--color-danger)">✕</text>
-                                                )}
-                                            </svg>
-                                        </div>
-                                    </div>
+                                    {/* Guilloche Pattern Background - Hide if background image is present */}
+                                    {!result.template?.theme_config?.background_url && <div className="certificate-guilloche" />}
 
-                                    {/* Body */}
-                                    <div className="certificate-body">
-                                        <div className="certificate-type-identifier">{result.document?.type.replace(/_/g, ' ')}</div>
-                                        <div className="certificate-statement">This document presence is formally verified and cryptographically secured.</div>
-
-                                        <div className="certificate-recipient-name">{result.document?.recipient_name}</div>
-                                        <div className="certificate-recipient-label">DOCUMENT RECIPIENT</div>
-
-                                        <div className="certificate-metadata-grid">
-                                            <div className="cert-meta-item">
-                                                <div className="cert-meta-label">ID Number / Reference</div>
-                                                <div className="cert-meta-value font-mono">{id || fingerprint}</div>
-                                            </div>
-                                            <div className="cert-meta-item">
-                                                <div className="cert-meta-label">Issuance Date</div>
-                                                <div className="cert-meta-value">{result.document?.issue_date ? new Date(result.document.issue_date).toLocaleDateString(undefined, { dateStyle: 'long' }) : '-'}</div>
-                                            </div>
-                                            <div className="cert-meta-item">
-                                                <div className="cert-meta-label">Expiration Status</div>
-                                                <div className="cert-meta-value">
-                                                    {result.document?.expiry_date
-                                                        ? new Date(result.document.expiry_date).toLocaleDateString(undefined, { dateStyle: 'long' })
-                                                        : 'Perpetual'
-                                                    }
+                                    {/* Content Layer */}
+                                    <div className="relative z-10 w-full h-full flex flex-col">
+                                        {/* Header */}
+                                        <div className="certificate-header">
+                                            <div className="certificate-institution">
+                                                <div className="certificate-issuer-logo">
+                                                    {result.issuer?.name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                    <div className="certificate-issuer-name">{result.issuer?.name}</div>
+                                                    <div className="certificate-issuer-meta">Official Digital Evidence · {result.issuer?.country}</div>
                                                 </div>
                                             </div>
+                                            <div className="certificate-seal">
+                                                <svg viewBox="0 0 100 100" className="w-24 h-24">
+                                                    <circle cx="50" cy="50" r="45" fill="none" stroke={result.template?.theme_config?.accent_color || "var(--color-accent)"} strokeWidth="1" strokeDasharray="2 2" />
+                                                    <circle cx="50" cy="50" r="38" fill="none" stroke={result.template?.theme_config?.accent_color || "var(--color-accent)"} strokeWidth="2" />
+                                                    <path id="curve" d="M 20,50 a 30,30 0 1,1 60,0 a 30,30 0 1,1 -60,0" fill="transparent" />
+                                                    <text className="text-[6px] uppercase tracking-[2px]" fill={result.template?.theme_config?.accent_color || "var(--color-accent)"}>
+                                                        <textPath href="#curve" startOffset="50%" textAnchor="middle">
+                                                            Authentic Evidence · Secured by DocFinger ·
+                                                        </textPath>
+                                                    </text>
+                                                    {result.verified ? (
+                                                        <g transform="translate(35, 35) scale(1.2)">
+                                                            <path d="M15 3.5l-4 4-2-2" stroke={result.template?.theme_config?.accent_color || "var(--color-accent)"} strokeWidth="2" fill="none" />
+                                                        </g>
+                                                    ) : (
+                                                        <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" fontSize="20" fill="var(--color-danger)">✕</text>
+                                                    )}
+                                                </svg>
+                                            </div>
+                                        </div>
 
-                                            {/* Dynamic Verified Metadata */}
-                                            {result.document && Object.entries(result.document).map(([key, value]) => {
-                                                // Identify custom keys that aren't the standard ones we already rendered
-                                                const standardKeys = ['type', 'subtype', 'recipient_name', 'issue_date', 'expiry_date'];
-                                                if (standardKeys.includes(key) || typeof value === 'object') return null;
+                                        {/* Body */}
+                                        <div className="certificate-body">
+                                            <div className="certificate-type-identifier uppercase tracking-widest" style={{ color: result.template?.theme_config?.accent_color }}>
+                                                {result.document?.type.replace(/_/g, ' ')}
+                                            </div>
+                                            <div className="certificate-statement">This document presence is formally verified and cryptographically secured.</div>
 
-                                                return (
-                                                    <div className="cert-meta-item" key={key}>
-                                                        <div className="cert-meta-label">{key.replace(/_/g, ' ')}</div>
-                                                        <div className="cert-meta-value">{String(value)}</div>
+                                            <div className="certificate-recipient-name">{result.document?.recipient_name}</div>
+                                            <div className="certificate-recipient-label">DOCUMENT RECIPIENT</div>
+
+                                            <div className="certificate-metadata-grid">
+                                                <div className="cert-meta-item">
+                                                    <div className="cert-meta-label">ID Number / Reference</div>
+                                                    <div className="cert-meta-value font-mono">{fingerprint}</div>
+                                                </div>
+                                                <div className="cert-meta-item">
+                                                    <div className="cert-meta-label">Issuance Date</div>
+                                                    <div className="cert-meta-value">{result.document?.issue_date ? new Date(result.document.issue_date).toLocaleDateString(undefined, { dateStyle: 'long' }) : '-'}</div>
+                                                </div>
+                                                <div className="cert-meta-item">
+                                                    <div className="cert-meta-label">Expiration Status</div>
+                                                    <div className="cert-meta-value">
+                                                        {result.document?.expiry_date
+                                                            ? new Date(result.document.expiry_date).toLocaleDateString(undefined, { dateStyle: 'long' })
+                                                            : 'Perpetual'
+                                                        }
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Footer / Evidence */}
-                                    <div className="certificate-footer">
-                                        <div className="certificate-evidence">
-                                            <div className="qr-placeholder flex items-center justify-center border border-[var(--color-accent-subtle)] bg-white p-2 rounded">
-                                                {/* In a real app we'd use a QR component here */}
-                                                <svg width="60" height="60" viewBox="0 0 24 24" fill="var(--color-accent)"><path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm13-2h3v2h-3zm-3 0h2v2h-2zm3 3h3v3h-3zm-3 0h2v2h-2zm3-3h3v2h-3zm-3 0h2v2h-2z" /></svg>
-                                            </div>
-                                            <div className="evidence-text">
-                                                <div className="text-[10px] uppercase font-bold text-[var(--color-text-muted)] tracking-widest">Cryptographic Evidence</div>
-                                                <div className="text-[8px] font-mono mt-1 text-[var(--color-text-secondary)] break-all truncate max-w-[200px]">
-                                                    {result.fingerprint_id}
                                                 </div>
-                                                <div className="text-[8px] italic mt-1 text-[var(--color-accent)]">Verified at {new Date(result.checked_at).toLocaleString()}</div>
+
+                                                {/* Dynamic Verified Metadata */}
+                                                {result.document && Object.entries(result.document).map(([key, value]) => {
+                                                    const standardKeys = ['type', 'subtype', 'recipient_name', 'issue_date', 'expiry_date'];
+                                                    if (standardKeys.includes(key) || typeof value === 'object') return null;
+
+                                                    return (
+                                                        <div className="cert-meta-item" key={key}>
+                                                            <div className="cert-meta-label">{key.replace(/_/g, ' ')}</div>
+                                                            <div className="cert-meta-value">{String(value)}</div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
-                                        <div className="certificate-signature">
-                                            <div className="signature-line" />
-                                            <div className="signature-label">Digital Registrar Registry</div>
+
+                                        {/* Footer / Evidence */}
+                                        <div className="certificate-footer">
+                                            <div className="certificate-evidence">
+                                                <div className="qr-placeholder flex items-center justify-center border border-[var(--color-accent-subtle)] bg-white p-2 rounded">
+                                                    <svg width="60" height="60" viewBox="0 0 24 24" fill={result.template?.theme_config?.accent_color || "var(--color-accent)"}><path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm13-2h3v2h-3zm-3 0h2v2h-2zm3 3h3v3h-3zm-3 0h2v2h-2zm3-3h3v2h-3zm-3 0h2v2h-2z" /></svg>
+                                                </div>
+                                                <div className="evidence-text">
+                                                    <div className="text-[10px] uppercase font-bold text-[var(--color-text-muted)] tracking-widest">Cryptographic Evidence</div>
+                                                    <div className="text-[8px] font-mono mt-1 text-[var(--color-text-secondary)] break-all truncate max-w-[200px]">
+                                                        {result.fingerprint_id}
+                                                    </div>
+                                                    <div className="text-[8px] italic mt-1 text-[var(--color-accent)]">Verified at {new Date(result.checked_at).toLocaleString()}</div>
+                                                </div>
+                                            </div>
+                                            <div className="certificate-signature">
+                                                <div className="signature-line" style={{ borderColor: result.template?.theme_config?.accent_color || '#1a1a1a' }} />
+                                                <div className="signature-label">Digital Registrar Registry</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -207,17 +240,11 @@ export default function Verify() {
                 .no-print, nav, .verify-header { display: none !important; }
                 body { background: white !important; padding: 0 !important; color: black !important; }
                 .verify-page { padding: 0 !important; background: none !important; display: block !important; }
-                .certificate-frame { 
-                    margin: 0 !important; 
-                    box-shadow: none !important; 
-                    border: none !important;
-                    width: 100% !important;
-                    height: 100vh !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                }
+                .certificate-frame.no-border { border: none !important; padding: 0 !important; }
+                .certificate-frame.no-border .certificate-border { border: none !important; padding: 0 !important; }
                 .certificate-inner { background: white !important; }
+                .certificate-inner img { z-index: 0 !important; }
+                .certificate-inner .relative { z-index: 10 !important; }
                 .certificate-border { border-color: #000 !important; }
             }
 
@@ -242,7 +269,8 @@ export default function Verify() {
                 margin-bottom: var(--space-4);
                 box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
             }
-            .verify-title { font-size: 2.5rem; font-weight: 800; tracking: -0.025em; }
+            .verify-title { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.025em; color: white; }
+            .verify-subtitle { color: #94a3b8; font-size: 1.125rem; }
             
             .verify-search-container { width: 100%; max-width: 560px; }
             .verify-search { display: flex; gap: var(--space-3); }
@@ -252,9 +280,8 @@ export default function Verify() {
                 border-color: rgba(255,255,255,0.1);
                 color: white;
             }
-            .verify-search .input:focus { background: rgba(255,255,255,0.1); }
+            .verify-search .input:focus { background: rgba(255,255,255,0.1); outline: none; border-color: var(--color-accent); }
 
-            /* Certificate Styling */
             .certificate-frame {
                 width: 100%;
                 max-width: 800px;
@@ -276,6 +303,7 @@ export default function Verify() {
                 position: relative;
                 overflow: hidden;
                 background: ivory;
+                min-height: 500px;
             }
             .certificate-guilloche {
                 position: absolute;
@@ -324,7 +352,7 @@ export default function Verify() {
 
             .certificate-footer {
                 display: flex; justify-content: space-between; align-items: flex-end;
-                margin-top: var(--space-12); border-top: 1px solid #e2e8f0; pt: var(--space-8);
+                margin-top: var(--space-12); border-top: 1px solid #e2e8f0; padding-top: var(--space-8);
             }
             .certificate-evidence { display: flex; gap: var(--space-4); align-items: center; }
             .certificate-signature { text-align: center; }

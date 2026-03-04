@@ -208,6 +208,15 @@ export interface VerificationResult {
         country: string;
         verification_level: number;
     };
+    template?: {
+        theme_config: {
+            background_url?: string;
+            accent_color?: string;
+            field_positions?: Record<string, { x: number; y: number }>;
+            seal_url?: string;
+            hide_default_border?: boolean;
+        };
+    } | null;
     checked_at: string;
     response_time_ms: number;
 }
@@ -305,7 +314,13 @@ export interface DocumentTemplate {
     nomenclature_config: Record<string, any>;
     default_expiry_days?: number;
     grace_period_days?: number;
-    theme_config: Record<string, any>;
+    theme_config: {
+        background_url?: string;
+        accent_color?: string;
+        field_positions?: Record<string, { x: number; y: number }>;
+        seal_url?: string;
+        hide_default_border?: boolean;
+    };
     is_active: boolean;
     created_at: string;
 }

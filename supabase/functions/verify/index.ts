@@ -71,7 +71,8 @@ async function verifySingle(
         .select(`
             id, fingerprint_id, document_type, document_subtype,
             recipient_name, issue_date, expiry_date, status,
-            institution_id, public_display, created_at
+            institution_id, public_display, created_at,
+            document_templates ( theme_config )
         `)
         .eq("fingerprint_id", normalizedId)
         .maybeSingle();
@@ -149,6 +150,9 @@ async function verifySingle(
             expiry_date: doc.expiry_date,
             ...(doc.public_display ?? {}),
         },
+        template: doc.document_templates ? {
+            theme_config: (doc.document_templates as any).theme_config
+        } : null,
         issuer: institutionInfo ? {
             code: institutionInfo.institution_code,
             name: institutionInfo.legal_name,

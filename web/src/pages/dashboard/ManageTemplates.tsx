@@ -16,7 +16,12 @@ export default function ManageTemplates() {
         document_subtype: '',
         default_expiry_days: 365,
         prefix: '',
-        force_auto: true
+        force_auto: true,
+        // Theme config fields
+        background_url: '',
+        seal_url: '',
+        accent_color: '#6366f1',
+        hide_default_border: false
     });
 
     useEffect(() => {
@@ -31,7 +36,11 @@ export default function ManageTemplates() {
             document_subtype: '',
             default_expiry_days: 365,
             prefix: '',
-            force_auto: true
+            force_auto: true,
+            background_url: '',
+            seal_url: '',
+            accent_color: '#6366f1',
+            hide_default_border: false
         });
         setEditingTemplate(null);
     };
@@ -61,6 +70,12 @@ export default function ManageTemplates() {
                 nomenclature_config: {
                     prefix: form.prefix,
                     force_auto: form.force_auto
+                },
+                theme_config: {
+                    background_url: form.background_url || undefined,
+                    seal_url: form.seal_url || undefined,
+                    accent_color: form.accent_color,
+                    hide_default_border: form.hide_default_border
                 }
             };
 
@@ -97,7 +112,11 @@ export default function ManageTemplates() {
             document_subtype: template.document_subtype || '',
             default_expiry_days: template.default_expiry_days || 365,
             prefix: (template.nomenclature_config as any)?.prefix || '',
-            force_auto: (template.nomenclature_config as any)?.force_auto ?? true
+            force_auto: (template.nomenclature_config as any)?.force_auto ?? true,
+            background_url: template.theme_config?.background_url || '',
+            seal_url: template.theme_config?.seal_url || '',
+            accent_color: template.theme_config?.accent_color || '#6366f1',
+            hide_default_border: template.theme_config?.hide_default_border ?? false
         });
         setIsCreating(true);
     };
@@ -183,6 +202,82 @@ export default function ManageTemplates() {
                         <label htmlFor="force_auto" className="text-sm text-gray-300">
                             Enforce automatic number generation for this blueprint
                         </label>
+                    </div>
+
+                    <div className="space-y-6 pt-6 border-t border-gray-700">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Layout className="w-5 h-5 text-blue-400" />
+                            Visual Branding
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-400">Background Image URL</label>
+                                <input
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
+                                    value={form.background_url}
+                                    onChange={e => setForm({ ...form, background_url: e.target.value })}
+                                    placeholder="https://cdn.example.com/template-bg.png"
+                                />
+                                <p className="text-[10px] text-gray-500 italic">Recommended: 2000x2800px PNG/JPG</p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-400">Institutional Seal URL</label>
+                                <input
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none"
+                                    value={form.seal_url}
+                                    onChange={e => setForm({ ...form, seal_url: e.target.value })}
+                                    placeholder="https://cdn.example.com/official-seal.png"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-gray-400">Accent Branding Color</label>
+                                <div className="flex gap-3">
+                                    <input
+                                        type="color"
+                                        className="w-12 h-12 bg-transparent border-none cursor-pointer"
+                                        value={form.accent_color}
+                                        onChange={e => setForm({ ...form, accent_color: e.target.value })}
+                                    />
+                                    <input
+                                        className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 outline-none uppercase font-mono"
+                                        value={form.accent_color}
+                                        onChange={e => setForm({ ...form, accent_color: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-3 p-4 bg-gray-900/50 border border-gray-700 rounded-xl">
+                                <input
+                                    type="checkbox"
+                                    id="hide_default_border"
+                                    className="w-4 h-4 rounded border-gray-700 text-blue-600 focus:ring-blue-500"
+                                    checked={form.hide_default_border}
+                                    onChange={e => setForm({ ...form, hide_default_border: e.target.checked })}
+                                />
+                                <label htmlFor="hide_default_border" className="text-sm text-gray-300">
+                                    Hide default certificate borders (for full-bleed templates)
+                                </label>
+                            </div>
+                        </div>
+
+                        {form.background_url && (
+                            <div className="p-4 bg-gray-900 rounded-xl border border-gray-700">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 block">Overlay Live Preview</label>
+                                <div className="relative aspect-[1/1.4] w-full max-w-[200px] mx-auto bg-white rounded shadow-2xl overflow-hidden border border-gray-600">
+                                    <img src={form.background_url} alt="Template" className="absolute inset-0 w-full h-full object-cover" />
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                                        <div className="w-1/2 h-1 bg-black/10 mb-2" />
+                                        <div className="w-3/4 h-2 bg-black/20 mb-4" />
+                                        <div className="text-[6px] font-bold text-gray-800 text-center tracking-tighter" style={{ color: form.accent_color }}>RECIPIENT NAME OVERLAY</div>
+                                        <div className="w-1/4 h-1 bg-black/10 mt-2" />
+                                    </div>
+                                    {form.seal_url && <img src={form.seal_url} alt="Seal" className="absolute top-2 right-2 w-8 h-8 object-contain" />}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-end space-x-4 pt-4 border-t border-gray-700">
