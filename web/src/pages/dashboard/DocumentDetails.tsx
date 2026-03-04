@@ -119,26 +119,35 @@ export default function DocumentDetails() {
                 </button>
 
                 <div className="flex gap-3">
-                    <button className="btn btn-secondary" onClick={() => window.print()}>
+                    <button
+                        className="btn btn-secondary flex items-center gap-2"
+                        onClick={() => window.open(`${window.location.origin}/verify/${doc.fingerprint_id}`, '_blank')}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                        Preview Certificate
+                    </button>
+                    <button className="btn btn-secondary flex items-center gap-2" onClick={() => window.print()}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-10 0v5h8v-5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        Print Details
+                        Print Report
                     </button>
                 </div>
             </div>
 
             {/* Status Banner */}
-            <div className="card mb-8" style={{ background: statusConfig.bg, borderColor: statusConfig.color + '44', padding: 'var(--space-5)' }}>
-                <div className="flex items-center gap-4">
-                    <div style={{ color: statusConfig.color }}>
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d={statusConfig.icon} strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: statusConfig.color, marginBottom: 2 }}>{statusConfig.label}</h2>
-                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{statusConfig.sub}</p>
+            <div className="no-print">
+                <div className="card mb-8" style={{ background: statusConfig.bg, borderLeft: `4px solid ${statusConfig.color}`, padding: 'var(--space-5)' }}>
+                    <div className="flex items-center gap-4">
+                        <div style={{ color: statusConfig.color }}>
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d={statusConfig.icon} strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: statusConfig.color, marginBottom: 2 }}>{statusConfig.label}</h2>
+                            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{statusConfig.sub}</p>
+                        </div>
                     </div>
                 </div>
             </div>
