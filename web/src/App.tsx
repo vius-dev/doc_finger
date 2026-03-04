@@ -11,6 +11,7 @@ import Settings from './pages/dashboard/Settings';
 import BulkUpload from './pages/dashboard/BulkUpload';
 import Verify from './pages/public/Verify';
 import Pricing from './pages/public/Pricing';
+import Apply from './pages/public/Apply';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/verify" element={<Verify />} />
           <Route path="/verify/:id" element={<Verify />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/apply" element={<Apply />} />
 
           {/* Dashboard routes (protected by DashboardLayout) */}
           <Route path="/dashboard" element={<DashboardLayout />}>

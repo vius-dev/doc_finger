@@ -27,15 +27,13 @@ Deno.serve(async (req: Request) => {
     const path = url.pathname.replace(/^\/institutions/, "");
 
     try {
-        // Public endpoint: get institution public info
+        // Public endpoints
         if (req.method === "GET" && path.startsWith("/public/")) {
             const code = path.replace("/public/", "");
             return await getPublicInstitution(code);
         }
-
-        // All other endpoints require authentication
-        if (req.method === "POST" && (path === "" || path === "/")) {
-            return await createInstitution(req);
+        if (req.method === "POST" && path === "/public/apply") {
+            return await applyInstitution(req);
         }
         if (req.method === "GET" && path && path !== "/") {
             const id = path.replace("/", "");
@@ -341,4 +339,81 @@ async function updateInstitution(
     }
 
     return successResponse(data);
+}
+
+/**
+ * POST /institutions/public/apply
+ * Public self-registration (application) endpoint.
+ */
+async function applyInstitution(req: Request): Promise<Response> {
+    const body = await req.json();
+
+    // Validate required fields
+    const requiredFields = [
+        "institution_code",
+        "legal_name",
+        "institution_type",
+        "country_code",
+        "primary_email",
+    ];
+    for (const field of requiredFields) {
+        if (!body[field]) {
+            return errorResponse(
+                "VALIDATION_ERROR",
+                `Missing required field: ${field}`,
+                400,
+                { field }
+            );
+        }
+    }
+
+    if (!VALID_INSTITUTION_TYPES.includes(body.institution_type)) {
+        return errorResponse(
+            "VALIDATION_ERROR",
+            `Invalid institution_type. Must be one of: ${VALID_INSTITUTION_TYPES.join(", ")}`,
+            400,
+            { field: "institution_type" }
+        );
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+        .from("institutions")
+        .insert({
+            institution_code: body.institution_code.toUpperCase(),
+            legal_name: body.legal_name,
+            trading_name: body.trading_name ?? null,
+            institution_type: body.institution_type,
+            country_code: body.country_code.toUpperCase(),
+            registration_number: body.registration_number ?? null,
+            primary_email: body.primary_email,
+            website: body.website ?? null,
+            billing_plan: body.billing_plan ?? "free",
+            status: "pending",
+            // Public applications don't have a creator ID or update signature
+        })
+        .select()
+        .single();
+
+    if (error) {
+        if (error.code === "23505") {
+            return errorResponse(
+                "DUPLICATE_ENTRY",
+                "An institution with this code already exists",
+                409
+            );
+        }
+        console.error("Failed to process application:", error);
+        return errorResponse("INTERNAL_ERROR", "Failed to process application", 500);
+    }
+
+    return successResponse(
+        {
+            id: data.id,
+            institution_code: data.institution_code,
+            status: data.status
+        },
+        undefined,
+        201
+    );
 }

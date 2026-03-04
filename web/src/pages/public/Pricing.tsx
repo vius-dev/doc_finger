@@ -1,169 +1,170 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const tiers = [
-    {
-        name: 'Developer',
-        id: 'free',
-        priceMonthly: '$0',
-        priceYearly: '$0',
-        description: 'Perfect for testing and small projects.',
-        features: [
-            { text: '100 documents / month', included: true },
-            { text: '1,000 verifications / month', included: true },
-            { text: '1 team member', included: true },
-            { text: 'API access', included: true },
-            { text: 'Community support', included: true },
-            { text: '3-month default expiry', included: true },
-            { text: 'Bulk operations', included: false },
-            { text: 'Webhooks', included: false },
-            { text: 'Priority support', included: false },
-        ],
-        cta: 'Get Started',
-        highlighted: false,
-    },
-    {
-        name: 'Business',
-        id: 'pro',
-        priceMonthly: '$99',
-        priceYearly: '$999',
-        description: 'For growing orgs with regular verification needs.',
-        features: [
-            { text: '1,000 documents / month', included: true },
-            { text: '10,000 verifications / month', included: true },
-            { text: '5 team members', included: true },
-            { text: 'API access', included: true },
-            { text: 'Email support (24h)', included: true },
-            { text: 'Bulk operations', included: true },
-            { text: 'Webhooks', included: true },
-            { text: 'Basic analytics', included: true },
-            { text: 'IP whitelisting', included: false },
-        ],
-        cta: 'Start Free Trial',
-        highlighted: true,
-    },
-    {
-        name: 'Enterprise',
-        id: 'enterprise',
-        priceMonthly: '$499',
-        priceYearly: '$4,999',
-        description: 'For large organisations with high-volume requirements.',
-        features: [
-            { text: '10,000 documents / month', included: true },
-            { text: '100,000 verifications / month', included: true },
-            { text: '20 team members', included: true },
-            { text: 'Priority support (4h)', included: true },
-            { text: 'Bulk operations', included: true },
-            { text: 'Advanced analytics', included: true },
-            { text: 'IP whitelisting', included: true },
-            { text: 'Audit logs', included: true },
-            { text: 'SSO integration', included: true },
-        ],
-        cta: 'Contact Sales',
-        highlighted: false,
-    },
+  {
+    name: 'Developer',
+    id: 'free',
+    priceMonthly: '$0',
+    priceYearly: '$0',
+    description: 'Perfect for testing and small projects.',
+    features: [
+      { text: '100 documents / month', included: true },
+      { text: '1,000 verifications / month', included: true },
+      { text: '1 team member', included: true },
+      { text: 'API access', included: true },
+      { text: 'Community support', included: true },
+      { text: '3-month default expiry', included: true },
+      { text: 'Bulk operations', included: false },
+      { text: 'Webhooks', included: false },
+      { text: 'Priority support', included: false },
+    ],
+    cta: 'Get Started',
+    highlighted: false,
+  },
+  {
+    name: 'Business',
+    id: 'pro',
+    priceMonthly: '$99',
+    priceYearly: '$999',
+    description: 'For growing orgs with regular verification needs.',
+    features: [
+      { text: '1,000 documents / month', included: true },
+      { text: '10,000 verifications / month', included: true },
+      { text: '5 team members', included: true },
+      { text: 'API access', included: true },
+      { text: 'Email support (24h)', included: true },
+      { text: 'Bulk operations', included: true },
+      { text: 'Webhooks', included: true },
+      { text: 'Basic analytics', included: true },
+      { text: 'IP whitelisting', included: false },
+    ],
+    cta: 'Start Free Trial',
+    highlighted: true,
+  },
+  {
+    name: 'Enterprise',
+    id: 'enterprise',
+    priceMonthly: '$499',
+    priceYearly: '$4,999',
+    description: 'For large organisations with high-volume requirements.',
+    features: [
+      { text: '10,000 documents / month', included: true },
+      { text: '100,000 verifications / month', included: true },
+      { text: '20 team members', included: true },
+      { text: 'Priority support (4h)', included: true },
+      { text: 'Bulk operations', included: true },
+      { text: 'Advanced analytics', included: true },
+      { text: 'IP whitelisting', included: true },
+      { text: 'Audit logs', included: true },
+      { text: 'SSO integration', included: true },
+    ],
+    cta: 'Contact Sales',
+    highlighted: false,
+  },
 ];
 
 const faqs = [
-    {
-        q: 'What happens if I exceed my limits?',
-        a: 'We notify you at 80% and 95%. You can upgrade or pay $0.05/document and $0.005/verification for overages.',
-    },
-    {
-        q: 'Can I switch plans?',
-        a: 'Yes — upgrade or downgrade any time. Changes are prorated and applied immediately.',
-    },
-    {
-        q: 'What payment methods are accepted?',
-        a: 'Cards, bank transfers, Paystack (Nigeria), M-Pesa (Kenya), and SnapScan (South Africa).',
-    },
-    {
-        q: 'Is there a free trial?',
-        a: 'The Developer plan is always free. Business and Enterprise plans include a 14-day free trial.',
-    },
+  {
+    q: 'What happens if I exceed my limits?',
+    a: 'We notify you at 80% and 95%. You can upgrade or pay $0.05/document and $0.005/verification for overages.',
+  },
+  {
+    q: 'Can I switch plans?',
+    a: 'Yes — upgrade or downgrade any time. Changes are prorated and applied immediately.',
+  },
+  {
+    q: 'What payment methods are accepted?',
+    a: 'Cards, bank transfers, Paystack (Nigeria), M-Pesa (Kenya), and SnapScan (South Africa).',
+  },
+  {
+    q: 'Is there a free trial?',
+    a: 'The Developer plan is always free. Business and Enterprise plans include a 14-day free trial.',
+  },
 ];
 
 export default function Pricing() {
-    const [annual, setAnnual] = useState(true);
+  const [annual, setAnnual] = useState(true);
 
-    return (
-        <div className="pricing-page animate-fade-in">
-            {/* Header */}
-            <header className="pricing-header">
-                <a href="/" className="pricing-back">← Back</a>
-                <h1 className="pricing-title">Simple, transparent pricing</h1>
-                <p className="pricing-subtitle">
-                    Choose the plan that fits your organisation. All plans include core document fingerprinting.
-                </p>
+  return (
+    <div className="pricing-page animate-fade-in">
+      {/* Header */}
+      <header className="pricing-header">
+        <a href="/" className="pricing-back">← Back</a>
+        <h1 className="pricing-title">Simple, transparent pricing</h1>
+        <p className="pricing-subtitle">
+          Choose the plan that fits your organisation. All plans include core document fingerprinting.
+        </p>
 
-                {/* Toggle */}
-                <div className="pricing-toggle">
-                    <button
-                        className={`pricing-toggle-btn ${!annual ? 'active' : ''}`}
-                        onClick={() => setAnnual(false)}
-                    >
-                        Monthly
-                    </button>
-                    <button
-                        className={`pricing-toggle-btn ${annual ? 'active' : ''}`}
-                        onClick={() => setAnnual(true)}
-                    >
-                        Yearly <span className="pricing-save">Save 16%</span>
-                    </button>
-                </div>
-            </header>
+        {/* Toggle */}
+        <div className="pricing-toggle">
+          <button
+            className={`pricing-toggle-btn ${!annual ? 'active' : ''}`}
+            onClick={() => setAnnual(false)}
+          >
+            Monthly
+          </button>
+          <button
+            className={`pricing-toggle-btn ${annual ? 'active' : ''}`}
+            onClick={() => setAnnual(true)}
+          >
+            Yearly <span className="pricing-save">Save 16%</span>
+          </button>
+        </div>
+      </header>
 
-            {/* Cards */}
-            <div className="pricing-grid">
-                {tiers.map((tier) => (
-                    <div key={tier.id} className={`pricing-card ${tier.highlighted ? 'pricing-card-highlight' : ''}`}>
-                        {tier.highlighted && <div className="pricing-badge">Most Popular</div>}
-                        <h2 className="pricing-card-name">{tier.name}</h2>
-                        <p className="pricing-card-desc">{tier.description}</p>
+      {/* Cards */}
+      <div className="pricing-grid">
+        {tiers.map((tier) => (
+          <div key={tier.id} className={`pricing-card ${tier.highlighted ? 'pricing-card-highlight' : ''}`}>
+            {tier.highlighted && <div className="pricing-badge">Most Popular</div>}
+            <h2 className="pricing-card-name">{tier.name}</h2>
+            <p className="pricing-card-desc">{tier.description}</p>
 
-                        <div className="pricing-card-price">
-                            <span className="pricing-amount">{annual ? tier.priceYearly : tier.priceMonthly}</span>
-                            <span className="pricing-period">/{annual ? 'year' : 'month'}</span>
-                        </div>
-
-                        <button className={`btn ${tier.highlighted ? 'btn-primary' : 'btn-secondary'} pricing-cta`}>
-                            {tier.cta}
-                        </button>
-
-                        <ul className="pricing-features">
-                            {tier.features.map((f) => (
-                                <li key={f.text} className={`pricing-feature ${f.included ? '' : 'pricing-feature-disabled'}`}>
-                                    {f.included ? (
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2">
-                                            <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                    ) : (
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2">
-                                            <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" />
-                                            <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" />
-                                        </svg>
-                                    )}
-                                    {f.text}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ))}
+            <div className="pricing-card-price">
+              <span className="pricing-amount">{annual ? tier.priceYearly : tier.priceMonthly}</span>
+              <span className="pricing-period">/{annual ? 'year' : 'month'}</span>
             </div>
 
-            {/* FAQ */}
-            <section className="pricing-faq">
-                <h2 className="pricing-faq-title">Frequently Asked Questions</h2>
-                <div className="pricing-faq-grid">
-                    {faqs.map((faq) => (
-                        <div key={faq.q} className="pricing-faq-item">
-                            <h3>{faq.q}</h3>
-                            <p>{faq.a}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
+            <Link to="/apply" className={`btn ${tier.highlighted ? 'btn-primary' : 'btn-secondary'} pricing-cta text-center flex items-center justify-center`}>
+              {tier.cta}
+            </Link>
 
-            <style>{`
+            <ul className="pricing-features">
+              {tier.features.map((f) => (
+                <li key={f.text} className={`pricing-feature ${f.included ? '' : 'pricing-feature-disabled'}`}>
+                  {f.included ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" />
+                      <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" />
+                    </svg>
+                  )}
+                  {f.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* FAQ */}
+      <section className="pricing-faq">
+        <h2 className="pricing-faq-title">Frequently Asked Questions</h2>
+        <div className="pricing-faq-grid">
+          {faqs.map((faq) => (
+            <div key={faq.q} className="pricing-faq-item">
+              <h3>{faq.q}</h3>
+              <p>{faq.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <style>{`
         .pricing-page {
           min-height: 100vh;
           background: var(--color-bg-primary);
@@ -346,6 +347,6 @@ export default function Pricing() {
           line-height: 1.6;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

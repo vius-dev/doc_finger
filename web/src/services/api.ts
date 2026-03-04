@@ -267,3 +267,16 @@ export async function updateInstitution(
 ): Promise<Institution> {
     return request('institutions', `/${id}`, { method: 'PATCH', body });
 }
+
+export async function applyInstitution(body: {
+    legal_name: string;
+    institution_code: string;
+    institution_type: string;
+    country_code: string;
+    primary_email: string;
+    website?: string;
+    trading_name?: string;
+    registration_number?: string;
+}): Promise<{ id: string; institution_code: string; status: string }> {
+    return request('institutions', '/public/apply', { method: 'POST', body, auth: false });
+}
