@@ -13,6 +13,38 @@ export interface AuthContext {
     environment: string;
 }
 
+/**
+ * Log a security-related event to the database.
+ */
+async function logSecurityEvent(
+    supabase: any,
+    event: string,
+    severity: string,
+    req: Request,
+    reason: string,
+    extraActorDetails: Record<string, any> = {}
+) {
+    try {
+        const url = new URL(req.url);
+        await supabase.from("security_audit_log").insert({
+            event_type: event,
+            severity,
+            reason,
+            actor_details: {
+                ip: req.headers.get("x-forwarded-for") ?? "unknown",
+                user_agent: req.headers.get("user-agent") ?? "unknown",
+                ...extraActorDetails,
+            },
+            request_details: {
+                method: req.method,
+                path: url.pathname + url.search,
+            },
+        });
+    } catch (err) {
+        console.error("Failed to log security event:", err);
+    }
+}
+
 // Maximum age of a request timestamp in seconds (5 minutes)
 const MAX_TIMESTAMP_AGE_SECONDS = 300;
 
@@ -62,6 +94,7 @@ export async function authenticateRequest(
         .gt("expires_at", new Date().toISOString());
 
     if (dbError || !candidates || candidates.length === 0) {
+        await logSecurityEvent(supabase, "auth.key_invalid", "low", req, "Key prefix not found or expired", { prefix });
         return {
             error: errorResponse("INVALID_API_KEY", "Invalid or expired API key", 401),
             context: null,
@@ -110,6 +143,10 @@ export async function authenticateRequest(
     const ageSeconds = Math.abs(now - requestTime) / 1000;
 
     if (isNaN(requestTime) || ageSeconds > MAX_TIMESTAMP_AGE_SECONDS) {
+        await logSecurityEvent(supabase, "auth.timestamp_expired", "medium", req, `Timestamp age: ${ageSeconds}s`, {
+            key_id: matchedKey.key_id,
+            timestamp,
+        });
         return {
             error: errorResponse(
                 "TIMESTAMP_EXPIRED",
@@ -133,6 +170,11 @@ export async function authenticateRequest(
     );
 
     if (!signatureValid) {
+        await logSecurityEvent(supabase, "auth.signature_invalid", "high", req, "HMAC verification failed", {
+            key_id: matchedKey.key_id,
+            timestamp,
+            provided_signature: signature,
+        });
         return {
             error: errorResponse(
                 "INVALID_SIGNATURE",

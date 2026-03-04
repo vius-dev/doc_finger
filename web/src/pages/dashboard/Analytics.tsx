@@ -1,18 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getDocuments, type Document } from '../../services/api';
+import { getDocuments, getInstitution, type Document, type Institution } from '../../services/api';
 
 export default function Analytics() {
-    const { institution } = useAuth();
+    const { institution: contextInst, institutionId } = useAuth();
     const [docs, setDocs] = useState<Document[]>([]);
+    const [institution, setInstitution] = useState<Institution | null>(contextInst);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getDocuments({ limit: 200 })
-            .then((d) => setDocs(Array.isArray(d) ? d : []))
-            .catch(() => { })
-            .finally(() => setLoading(false));
-    }, []);
+        const loadData = async () => {
+            try {
+                const [d, inst] = await Promise.all([
+                    getDocuments({ limit: 200 }),
+                    institutionId ? getInstitution(institutionId) : Promise.resolve(null)
+                ]);
+                setDocs(Array.isArray(d) ? d : []);
+                if (inst) setInstitution(inst);
+            } catch (err) {
+                console.error('Failed to load analytics data', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [institutionId]);
 
     const stats = {
         total: docs.length,

@@ -12,6 +12,8 @@ import {
     handleCors,
 } from "../_shared/response.ts";
 import { authenticateRequest, hasPermission } from "../_shared/auth.ts";
+import { getCachedResponse, saveIdempotentResponse } from "../_shared/idempotency.ts";
+
 
 Deno.serve(async (req: Request) => {
     const corsResponse = handleCors(req);
@@ -90,6 +92,13 @@ async function registerDocument(req: Request): Promise<Response> {
         );
     }
 
+    const supabase = getSupabaseAdmin();
+    const idempotencyKey = req.headers.get("X-Idempotency-Key");
+
+    // Check for cached idempotent response
+    const cached = await getCachedResponse(supabase, context.institutionId, idempotencyKey);
+    if (cached) return cached;
+
     const body = await req.json();
 
     // Validate required fields
@@ -105,7 +114,7 @@ async function registerDocument(req: Request): Promise<Response> {
         }
     }
 
-    const supabase = getSupabaseAdmin();
+
 
     // Get institution code for fingerprint prefix
     const { data: institution, error: instError } = await supabase
@@ -178,21 +187,28 @@ async function registerDocument(req: Request): Promise<Response> {
         );
     }
 
-    return successResponse(
-        {
-            id: data.id,
-            fingerprint_id: data.fingerprint_id,
-            sha256_hash: data.sha256_hash,
-            document_type: data.document_type,
-            recipient_name: data.recipient_name,
-            issue_date: data.issue_date,
-            expiry_date: data.expiry_date,
-            status: data.status,
-            verification_url: `https://verify.docfingerprint.com/${data.fingerprint_id}`,
-        },
-        undefined,
-        201
+    const responseData = {
+        id: data.id,
+        fingerprint_id: data.fingerprint_id,
+        sha256_hash: data.sha256_hash,
+        document_type: data.document_type,
+        recipient_name: data.recipient_name,
+        issue_date: data.issue_date,
+        expiry_date: data.expiry_date,
+        status: data.status,
+        verification_url: `https://verify.docfingerprint.com/${data.fingerprint_id}`,
+    };
+
+    // Save for idempotency
+    await saveIdempotentResponse(
+        supabase,
+        context.institutionId,
+        idempotencyKey,
+        201,
+        responseData
     );
+
+    return successResponse(responseData, undefined, 201);
 }
 
 /**
