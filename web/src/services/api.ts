@@ -169,6 +169,7 @@ export async function registerDocument(body: {
     recipient_id_type?: string;
     recipient_id_value?: string;
     metadata?: Record<string, unknown>;
+    template_id?: string;
 }): Promise<{
     fingerprint_id: string;
     sha256_hash: string;
@@ -244,6 +245,36 @@ export async function listApiKeys(): Promise<ApiKey[]> {
 
 export async function revokeApiKey(keyId: string): Promise<void> {
     return request('auth', `/keys/${keyId}`, { method: 'DELETE' });
+}
+
+export async function createApiKey(body: {
+    environment: 'test' | 'production';
+    name?: string;
+    permissions?: Record<string, boolean>;
+    expires_in_days?: number;
+}): Promise<{
+    key_id: string;
+    api_key: string;
+    key_preview: string;
+    environment: string;
+    permissions: Record<string, boolean>;
+    expires_at: string;
+}> {
+    return request('auth', '/keys', { method: 'POST', body });
+}
+
+// ============ Bulk Upload ============
+
+export interface BulkResult {
+    total: number;
+    successful: number;
+    failed: number;
+    documents: { fingerprint_id: string; recipient_name: string; status: string }[];
+    errors: { index: number; recipient_name: string; error: string }[];
+}
+
+export async function bulkUpload(documents: any[]): Promise<BulkResult> {
+    return request('bulk-upload', '/', { method: 'POST', body: { documents } });
 }
 
 // ============ Institutions ============

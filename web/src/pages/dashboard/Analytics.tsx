@@ -59,7 +59,7 @@ export default function Analytics() {
             </div>
 
             {/* Stats grid */}
-            <div className="grid grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-stack grid-cols-2-md grid-cols-4-lg gap-4 mb-8">
                 <div className="stat-card">
                     <div className="stat-value">{stats.total}</div>
                     <div className="stat-label">Total Documents</div>
@@ -78,7 +78,7 @@ export default function Analytics() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-stack grid-cols-2-md gap-6">
                 {/* By type */}
                 <div className="card">
                     <div className="card-header"><h3 className="card-title">By Document Type</h3></div>

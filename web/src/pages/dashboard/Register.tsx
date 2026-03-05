@@ -92,7 +92,7 @@ export default function Register() {
                 recipient_id_type: form.recipient_id_type || undefined,
                 recipient_id_value: form.recipient_id_value || undefined,
                 template_id: form.template_id || undefined,
-            } as any);
+            });
             setSuccess(result);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (err) {

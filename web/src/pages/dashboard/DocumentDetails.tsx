@@ -116,7 +116,7 @@ export default function DocumentDetails() {
         <div className="animate-fade-in max-w-5xl">
             {/* Screen UI - Hidden on Print */}
             <div className="no-print">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                     <button onClick={() => navigate(-1)} className="btn btn-ghost">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
                             <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -124,7 +124,7 @@ export default function DocumentDetails() {
                         Back to Registry
                     </button>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
                         <button
                             className="btn btn-secondary flex items-center gap-2"
                             onClick={() => window.open(`${window.location.origin}/verify/${doc.fingerprint_id}`, '_blank')}
@@ -170,16 +170,16 @@ export default function DocumentDetails() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-stack grid-cols-1 grid-cols-3-lg gap-8">
                     {/* Main Identity Area */}
                     <div className="lg:col-span-2 space-y-8">
                         <div className="card">
-                            <div className="card-header flex justify-between items-center">
+                            <div className="card-header flex justify-between items-center flex-wrap gap-2">
                                 <h3 className="card-title">Issuance Identity</h3>
                                 <span className="badge badge-active" style={{ textTransform: 'capitalize' }}>{doc.document_type.replace(/_/g, ' ')}</span>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12 py-4">
+                            <div className="grid grid-cols-1 grid-cols-2-md gap-y-6 gap-x-12 py-4">
                                 <div>
                                     <label className="form-label mb-1 block">Recipient Full Name</label>
                                     <div className="text-xl font-bold text-[var(--color-text-primary)]">{doc.recipient_name}</div>
@@ -212,8 +212,8 @@ export default function DocumentDetails() {
 
                             <div className="mt-8 pt-8 border-t border-[var(--color-border)]">
                                 <label className="form-label mb-2 block">System Fingerprint</label>
-                                <div className="flex items-center gap-2 bg-[var(--color-bg-input)] p-3 rounded-md border border-[var(--color-border)] group">
-                                    <code className="flex-1 font-mono text-sm text-[var(--color-accent)]">{doc.fingerprint_id}</code>
+                                <div className="flex items-center gap-2 bg-[var(--color-bg-input)] p-3 rounded-md border border-[var(--color-border)] group overflow-hidden">
+                                    <code className="flex-1 font-mono text-sm text-[var(--color-accent)] truncate">{doc.fingerprint_id}</code>
                                     <button
                                         className="btn btn-ghost btn-sm"
                                         onClick={() => copyToClipboard(doc.fingerprint_id)}
@@ -229,16 +229,16 @@ export default function DocumentDetails() {
 
                         <div className="card">
                             <div className="card-header"><h3 className="card-title">Cryptographic Evidence</h3></div>
-                            <div className="space-y-4 py-2">
+                            <div className="space-y-6 py-2">
                                 <div>
                                     <label className="form-label mb-2 block">Immutable SHA-256 Content Hash</label>
-                                    <div className="flex gap-2 items-start bg-[var(--color-bg-input)] p-4 rounded-md border border-[var(--color-border)]">
+                                    <div className="flex gap-2 items-start bg-[var(--color-bg-input)] p-4 rounded-md border border-[var(--color-border)] overflow-hidden">
                                         <code className="flex-1 font-mono text-xs break-all text-[var(--color-text-secondary)] leading-relaxed">
                                             {doc.sha256_hash}
                                         </code>
                                         <button
                                             className="btn btn-ghost btn-sm"
-                                            onClick={() => copyToClipboard(doc.sha256_hash)}
+                                            onClick={() => navigator.clipboard.writeText(doc.sha256_hash)}
                                             title="Copy Hash"
                                         >
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -246,10 +246,41 @@ export default function DocumentDetails() {
                                             </svg>
                                         </button>
                                     </div>
-                                    <p className="form-hint mt-2">This hash is the unique identifier used to verify document integrity without storing the actual file content.</p>
+                                </div>
+                                <div className="grid grid-cols-1 grid-cols-2-md gap-6">
+                                    <div>
+                                        <label className="form-label mb-1 block">Algorithm</label>
+                                        <div className="text-sm font-semibold">SHA-256 / Ed25519</div>
+                                    </div>
+                                    <div>
+                                        <label className="form-label mb-1 block">Network Status</label>
+                                        <div className="flex items-center gap-2 text-sm text-[var(--color-success)]">
+                                            <span className="w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse" />
+                                            Confirmed on Mainnet
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Extended Data */}
+                        {doc.document_metadata && Object.keys(doc.document_metadata).length > 0 && (
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">Extended Metadata</h3>
+                                </div>
+                                <div className="grid grid-cols-1 grid-cols-2-md gap-6">
+                                    {Object.entries(doc.document_metadata).map(([key, value]) => (
+                                        <div key={key}>
+                                            <label className="form-label mb-1 block" style={{ textTransform: 'capitalize' }}>
+                                                {key.replace(/_/g, ' ')}
+                                            </label>
+                                            <div className="text-sm font-medium">{String(value)}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Sidebar Info Area */}
@@ -269,20 +300,6 @@ export default function DocumentDetails() {
                                 )}
                             </div>
                         </div>
-
-                        {doc.document_metadata && Object.keys(doc.document_metadata).length > 0 && (
-                            <div className="card">
-                                <div className="card-header"><h3 className="card-title">Extended Data</h3></div>
-                                <div className="grid grid-cols-1 gap-3 py-2">
-                                    {Object.entries(doc.document_metadata).map(([key, value]) => (
-                                        <div key={key} className="bg-[var(--color-bg-elevated)] p-3 rounded border border-[var(--color-border)]">
-                                            <div className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-bold">{key.replace(/_/g, ' ')}</div>
-                                            <div className="text-sm font-medium mt-1">{String(value)}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         {doc.status === 'active' && (
                             <div className="card" style={{ borderColor: 'var(--color-danger-bg)', background: 'rgba(239, 68, 68, 0.02)' }}>

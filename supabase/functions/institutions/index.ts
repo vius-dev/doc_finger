@@ -35,6 +35,19 @@ Deno.serve(async (req: Request) => {
         if (req.method === "POST" && path === "/public/apply") {
             return await applyInstitution(req);
         }
+        // Document Template Endpoints (Must come before dynamic ID routes)
+        if (path === "/templates") {
+            if (req.method === "GET") return await listTemplates(req);
+            if (req.method === "POST") return await createTemplate(req);
+        }
+        if (path.startsWith("/templates/")) {
+            const id = path.replace("/templates/", "");
+            if (req.method === "GET") return await getTemplate(req, id);
+            if (req.method === "PATCH") return await updateTemplate(req, id);
+            if (req.method === "DELETE") return await deleteTemplate(req, id);
+        }
+
+        // Institution CRUD
         if (req.method === "GET" && path && path !== "/") {
             const id = path.replace("/", "");
             return await getInstitution(req, id);
@@ -45,18 +58,6 @@ Deno.serve(async (req: Request) => {
         if (req.method === "PATCH" && path && path !== "/") {
             const id = path.replace("/", "");
             return await updateInstitution(req, id);
-        }
-
-        // Document Template Endpoints
-        if (path === "/templates") {
-            if (req.method === "GET") return await listTemplates(req);
-            if (req.method === "POST") return await createTemplate(req);
-        }
-        if (path.startsWith("/templates/")) {
-            const id = path.replace("/templates/", "");
-            if (req.method === "GET") return await getTemplate(req, id);
-            if (req.method === "PATCH") return await updateTemplate(req, id);
-            if (req.method === "DELETE") return await deleteTemplate(req, id);
         }
 
         return errorResponse("NOT_FOUND", "Endpoint not found", 404);

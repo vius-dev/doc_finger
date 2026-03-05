@@ -32,6 +32,11 @@ Deno.serve(async (req: Request) => {
 
     try {
         // Route requests
+        // Validate Key (Must come before dynamic key ID routes)
+        if (req.method === "POST" && path === "/keys/validate") {
+            return await validateApiKey(req);
+        }
+
         if (req.method === "POST" && path === "/keys") {
             return await createApiKey(req);
         }
@@ -41,9 +46,6 @@ Deno.serve(async (req: Request) => {
         if (req.method === "DELETE" && path.startsWith("/keys/")) {
             const keyId = path.replace("/keys/", "");
             return await revokeApiKey(req, keyId);
-        }
-        if (req.method === "POST" && path === "/keys/validate") {
-            return await validateApiKey(req);
         }
 
         return errorResponse("NOT_FOUND", "Endpoint not found", 404);

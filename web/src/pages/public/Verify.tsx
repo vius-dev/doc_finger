@@ -282,6 +282,19 @@ export default function Verify() {
             }
             .verify-search .input:focus { background: rgba(255,255,255,0.1); outline: none; border-color: var(--color-accent); }
 
+            @media (max-width: 768px) {
+                .verify-search { flex-direction: column; }
+                .verify-title { font-size: 1.75rem; }
+                .verify-subtitle { font-size: 1rem; }
+                .certificate-inner { padding: var(--space-6) var(--space-4) !important; min-height: auto !important; }
+                .certificate-header { flex-direction: column; align-items: center; gap: var(--space-6); text-align: center; }
+                .certificate-institution { flex-direction: column; }
+                .certificate-recipient-name { font-size: 1.75rem !important; padding: 0 var(--space-4) !important; }
+                .certificate-metadata-grid { grid-template-columns: 1fr !important; gap: var(--space-4) !important; }
+                .certificate-footer { flex-direction: column; align-items: center; gap: var(--space-8); }
+                .certificate-signature { order: -1; }
+            }
+
             .certificate-frame {
                 width: 100%;
                 max-width: 800px;

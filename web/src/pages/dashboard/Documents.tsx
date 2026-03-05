@@ -52,7 +52,7 @@ export default function Documents() {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header flex items-center justify-between">
+            <div className="page-header flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 className="page-title">Documents</h1>
                     <p className="page-subtitle">Manage and track all your issued documents</p>

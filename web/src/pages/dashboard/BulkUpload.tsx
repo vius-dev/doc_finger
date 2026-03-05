@@ -1,13 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { getApiKey } from '../../services/api';
-
-interface BulkResult {
-    total: number;
-    successful: number;
-    failed: number;
-    documents: { fingerprint_id: string; recipient_name: string; status: string }[];
-    errors: { index: number; recipient_name: string; error: string }[];
-}
+import { bulkUpload, type BulkResult } from '../../services/api';
 
 const CSV_TEMPLATE = `recipient_name,document_type,issue_date,document_number,expiry_date
 John Doe,degree_certificate,2024-06-15,CERT-001,
@@ -41,7 +33,7 @@ export default function BulkUpload() {
         setResult(null);
 
         try {
-            let documents: Record<string, string>[];
+            let documents: any[];
 
             // Try JSON first, fall back to CSV parsing
             try {
@@ -60,28 +52,8 @@ export default function BulkUpload() {
                 throw new Error('Maximum 500 documents per batch.');
             }
 
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tzulhmrmscedulpldvnk.supabase.co';
-            const apiKey = getApiKey();
-            const timestamp = new Date().toISOString();
-
-            const res = await fetch(`${supabaseUrl}/functions/v1/bulk-upload`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${apiKey}`,
-                    'X-Timestamp': timestamp,
-                    'X-Signature': btoa(timestamp),
-                },
-                body: JSON.stringify({ documents }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok || data.status === 'error') {
-                throw new Error(data.error?.message || 'Bulk upload failed');
-            }
-
-            setResult(data.data);
+            const data = await bulkUpload(documents);
+            setResult(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Upload failed');
         } finally {
@@ -156,7 +128,7 @@ export default function BulkUpload() {
                         <h3 className="card-title">Upload Results</h3>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-stack grid-cols-3-md gap-4 mb-6">
                         <div className="stat-card">
                             <div className="stat-value">{result.total}</div>
                             <div className="stat-label">Total</div>
