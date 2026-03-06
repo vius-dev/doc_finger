@@ -1,7 +1,7 @@
 // Authentication middleware for Edge Functions
 // Validates API keys and HMAC signatures, enforces rate limiting
 
-import { getSupabaseAdmin } from "./supabase.ts";
+import { getSupabaseAdmin, getSupabaseAnon } from "./supabase.ts";
 import { verifyApiKey, verifyHmacSignature } from "./crypto.ts";
 import { errorResponse } from "./response.ts";
 
@@ -11,6 +11,8 @@ export interface AuthContext {
     keyId: string;
     permissions: Record<string, boolean>;
     environment: string;
+    isAdmin?: boolean;
+    userId?: string;
 }
 
 /**
@@ -59,8 +61,10 @@ const MAX_TIMESTAMP_AGE_SECONDS = 300;
 export async function authenticateRequest(
     req: Request
 ): Promise<{ error: Response | null; context: AuthContext | null }> {
-    // 1. Extract API key from Authorization header
     const authHeader = req.headers.get("Authorization") ?? "";
+    const apiKeyHeader = req.headers.get("apikey") ?? "none";
+
+    console.log(`[AUTH] Method: ${req.method} | Auth: ${authHeader.slice(0, 20)}... | ApiKey: ${apiKeyHeader.slice(0, 10)}...`);
     if (!authHeader.startsWith("Bearer ")) {
         return {
             error: errorResponse(
@@ -74,6 +78,56 @@ export async function authenticateRequest(
 
     const providedKey = authHeader.slice(7); // Remove 'Bearer '
 
+    const supabase = getSupabaseAdmin();
+
+    // Check if the token is a JWT (starts with eyJ)
+    if (providedKey.startsWith("eyJ")) {
+        const authClient = getSupabaseAnon();
+        const { data: { user }, error: jwtError } = await authClient.auth.getUser(providedKey);
+
+        if (jwtError || !user) {
+            return {
+                error: errorResponse("UNAUTHORIZED", `Invalid session token: ${jwtError?.message || "User not found"}`, 401),
+                context: null
+            };
+        }
+
+        // Verify if user is an admin
+        const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .single();
+
+        if (roleData?.role !== "admin") {
+            return {
+                error: errorResponse("FORBIDDEN", "Admin role required", 403),
+                context: null
+            };
+        }
+
+        // Admin is fully trusted, bypass HMAC
+        return {
+            error: null,
+            context: {
+                institutionId: "admin", // Will be overridden in the route handler
+                apiKeyId: "admin_jwt",
+                keyId: "admin_jwt",
+                permissions: {
+                    "keys:create": true,
+                    "keys:revoke": true,
+                    "keys:read": true,
+                    "institutions:create": true,
+                    "institutions:read_all": true,
+                    "institutions:update_all": true
+                },
+                environment: "admin",
+                isAdmin: true,
+                userId: user.id
+            }
+        };
+    }
+
     // 2. Look up candidate keys by prefix (narrows the search)
     const prefix = providedKey.split("_")[0];
     if (!prefix) {
@@ -82,12 +136,10 @@ export async function authenticateRequest(
             context: null,
         };
     }
-
-    const supabase = getSupabaseAdmin();
     const { data: candidates, error: dbError } = await supabase
         .from("api_keys")
         .select(
-            "id, key_id, institution_id, key_hash, permissions, environment, expires_at, status"
+            "id, key_id, institution_id, key_hash, permissions, environment, expires_at, status, usage_limit, usage_count"
         )
         .like("key_preview", `${prefix}%`)
         .eq("status", "active")
@@ -118,6 +170,23 @@ export async function authenticateRequest(
     if (!matchedKey) {
         return {
             error: errorResponse("INVALID_API_KEY", "Invalid or expired API key", 401),
+            context: null,
+        };
+    }
+
+    // Check usage limits
+    if (matchedKey.usage_limit !== null && matchedKey.usage_count >= matchedKey.usage_limit) {
+        await logSecurityEvent(supabase, "auth.key_limit_exceeded", "high", req, "API Key usage limit reached", {
+            key_id: matchedKey.key_id,
+            usage_count: matchedKey.usage_count,
+            usage_limit: matchedKey.usage_limit
+        });
+
+        // Auto-expire the key in the database just in case
+        await supabase.from("api_keys").update({ status: 'expired' }).eq("id", matchedKey.id);
+
+        return {
+            error: errorResponse("RATE_LIMIT_EXCEEDED", "API Key usage limit has been exceeded", 429),
             context: null,
         };
     }
@@ -160,7 +229,15 @@ export async function authenticateRequest(
     // Reconstruct the signed message: timestamp\nmethod\npath\nbody
     const url = new URL(req.url);
     const body = req.method !== "GET" ? await req.clone().text() : "";
-    const fullPath = url.pathname + url.search;
+
+    // Normalize path for signature verification: 
+    // The client sends "/function-name/path", but the server sees "/functions/v1/function-name/path"
+    let sigPath = url.pathname;
+    if (sigPath.startsWith("/functions/v1")) {
+        sigPath = sigPath.replace("/functions/v1", "");
+    }
+    const fullPath = sigPath + url.search;
+
     const message = `${timestamp}\n${req.method}\n${fullPath}\n${body}`;
 
     const signatureValid = await verifyHmacSignature(
@@ -170,10 +247,12 @@ export async function authenticateRequest(
     );
 
     if (!signatureValid) {
+        console.error(`[AUTH] Signature mismatch! \nExpected Path: ${fullPath}\nMethod: ${req.method}\nTimestamp: ${timestamp}`);
         await logSecurityEvent(supabase, "auth.signature_invalid", "high", req, "HMAC verification failed", {
             key_id: matchedKey.key_id,
             timestamp,
             provided_signature: signature,
+            expected_path: fullPath
         });
         return {
             error: errorResponse(

@@ -31,8 +31,7 @@ export default function Register() {
         expiry_date: string;
     } | null>(null);
 
-    const [isAutoNumber, setIsAutoNumber] = useState(true);
-    const [isAutoDates, setIsAutoDates] = useState(true);
+
 
     const [form, setForm] = useState({
         recipient_name: '',
@@ -40,9 +39,11 @@ export default function Register() {
         recipient_phone: '',
         recipient_id_type: 'national_id',
         recipient_id_value: '',
+        height: '',
+        gender: '',
+        state: '',
         document_type: '',
         document_number: '',
-        issue_date: new Date().toISOString().split('T')[0],
         expiry_date: '',
         template_id: '',
     });
@@ -81,18 +82,27 @@ export default function Register() {
         setError(null);
 
         try {
-            const result = await api.registerDocument({
+            const metadata: Record<string, string> = {};
+            if (form.height) metadata.height = form.height;
+            if (form.gender) metadata.gender = form.gender;
+            if (form.state) metadata.state = form.state;
+
+            const payload = {
                 recipient_name: form.recipient_name,
                 document_type: form.document_type,
-                issue_date: isAutoDates ? undefined : form.issue_date,
-                document_number: isAutoNumber ? undefined : (form.document_number || undefined),
-                expiry_date: isAutoDates ? undefined : (form.expiry_date || undefined),
+                issue_date: new Date().toISOString().split('T')[0],
+                document_number: undefined,
+                expiry_date: undefined,
                 recipient_email: form.recipient_email || undefined,
                 recipient_phone: form.recipient_phone || undefined,
                 recipient_id_type: form.recipient_id_type || undefined,
                 recipient_id_value: form.recipient_id_value || undefined,
                 template_id: form.template_id || undefined,
-            });
+                metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+            };
+            console.log("PAYLOAD BEING SENT:", payload);
+
+            const result = await api.registerDocument(payload);
             setSuccess(result);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (err) {
@@ -182,6 +192,32 @@ export default function Register() {
                                     <label className="form-label">Contact Email</label>
                                     <input type="email" className="input" value={form.recipient_email} onChange={(e) => updateField('recipient_email', e.target.value)} placeholder="For automated verification receipts" />
                                 </div>
+
+                                <div className="border-t border-[var(--color-border)] pt-4 mt-2">
+                                    <h4 className="text-sm font-semibold mb-3">Anti-Fraud / Physical Traits</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div className="form-group">
+                                            <label className="form-label">Height</label>
+                                            <input className="input" value={form.height} onChange={(e) => updateField('height', e.target.value)} placeholder="e.g. 5'10 / 178cm" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Gender</label>
+                                            <select className="select" value={form.gender} onChange={(e) => updateField('gender', e.target.value)}>
+                                                <option value="">Select...</option>
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">State / Region</label>
+                                            <input className="input" value={form.state} onChange={(e) => updateField('state', e.target.value)} placeholder="Current State" />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                                        These hidden traits are exclusively visible to institutional verifiers for visual cross-referencing and are kept strictly off the public certificate.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -197,8 +233,8 @@ export default function Register() {
                                     <h3 className="card-title">Document Logic</h3>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
-                                    Automation
-                                    <input type="checkbox" checked={isAutoNumber && isAutoDates} onChange={(e) => { setIsAutoNumber(e.target.checked); setIsAutoDates(e.target.checked); }} className="accent-[var(--color-accent)]" />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Automation Active
                                 </div>
                             </div>
 
@@ -212,7 +248,7 @@ export default function Register() {
                                             onChange={(e) => handleTemplateChange(e.target.value)}
                                             style={{ borderColor: form.template_id ? 'var(--color-accent)' : undefined }}
                                         >
-                                            <option value="">Start from Scratch (Manual)</option>
+                                            <option value="">Select a Template...</option>
                                             {templates.map(t => (
                                                 <option key={t.id} value={t.id}>{t.name}</option>
                                             ))}
@@ -231,32 +267,23 @@ export default function Register() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label flex justify-between">
+                                    <label className="form-label">
                                         Official ID / Reference
-                                        <span className="text-[10px] uppercase text-[var(--color-accent)] cursor-pointer" onClick={() => setIsAutoNumber(!isAutoNumber)}>
-                                            {isAutoNumber ? 'Manual Entry' : 'Auto-Generate'}
-                                        </span>
                                     </label>
-                                    <input className="input" disabled={isAutoNumber} value={isAutoNumber ? 'SYSTEM-GENERATED' : form.document_number} onChange={(e) => updateField('document_number', e.target.value)} placeholder="e.g. CERT-2026-001" style={isAutoNumber ? { background: 'var(--color-bg-primary)', fontStyle: 'italic', opacity: 0.6 } : {}} />
-                                    {isAutoNumber && <p className="form-hint">A unique sequence will be allocated by the registry.</p>}
+                                    <input className="input" disabled value="SYSTEM-GENERATED" style={{ background: 'var(--color-bg-primary)', fontStyle: 'italic', opacity: 0.6 }} />
+                                    <p className="form-hint">A unique sequence will be allocated by the registry.</p>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="form-group">
                                         <label className="form-label">Issuance Date</label>
-                                        <input className="input" type="date" disabled={isAutoDates} value={form.issue_date} onChange={(e) => updateField('issue_date', e.target.value)} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Expiry Date</label>
-                                        <input className="input" type="date" disabled={isAutoDates} value={isAutoDates ? '' : form.expiry_date} onChange={(e) => updateField('expiry_date', e.target.value)} placeholder={isAutoDates ? 'Auto-Calculated' : ''} />
+                                        <input className="input" disabled value="SYSTEM-GENERATED (TODAY)" style={{ background: 'var(--color-bg-primary)', fontStyle: 'italic', opacity: 0.6 }} />
                                     </div>
                                 </div>
-                                {isAutoDates && (
-                                    <div className="p-3 bg-[var(--color-bg-elevated)] rounded border border-[var(--color-border)] flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-                                        Lifecycle rules will apply based on classification.
-                                    </div>
-                                )}
+                                <div className="p-3 bg-[var(--color-bg-elevated)] rounded border border-[var(--color-border)] flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+                                    Lifecycle rules and expiry dates will apply automatically based on classification.
+                                </div>
                             </div>
                         </div>
                     </div>

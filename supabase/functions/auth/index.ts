@@ -28,7 +28,11 @@ Deno.serve(async (req: Request) => {
     if (corsResponse) return corsResponse;
 
     const url = new URL(req.url);
-    const path = url.pathname.replace(/^\/auth/, "");
+    const pathParts = url.pathname.split('/');
+    const functionIndex = pathParts.findIndex(p => p === 'auth');
+    const path = '/' + pathParts.slice(functionIndex + 1).filter(Boolean).join('/');
+
+    console.log(`[AUTH-SVC] Request: ${req.method} ${url.pathname} -> Path: ${path}`);
 
     try {
         // Route requests
@@ -84,6 +88,8 @@ async function createApiKey(req: Request): Promise<Response> {
         name,
         permissions,
         expires_in_days,
+        institution_id,
+        usage_limit = null,
     } = body;
 
     // Validate environment
@@ -98,11 +104,17 @@ async function createApiKey(req: Request): Promise<Response> {
 
     const supabase = getSupabaseAdmin();
 
+    const targetInstitutionId = context.isAdmin ? institution_id : context.institutionId;
+
+    if (!targetInstitutionId) {
+        return errorResponse("VALIDATION_ERROR", "Missing institution_id for admin request", 400);
+    }
+
     // Get institution code for key prefix
     const { data: institution, error: instError } = await supabase
         .from("institutions")
         .select("institution_code")
-        .eq("id", context.institutionId)
+        .eq("id", targetInstitutionId)
         .single();
 
     if (instError || !institution) {
@@ -143,23 +155,28 @@ async function createApiKey(req: Request): Promise<Response> {
         "stats:read": true,
     };
 
+    // Handle creator ID (must be a valid UUID or null)
+    const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const creatorId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
     // Store in database (hash:salt format)
     const { error: insertError } = await supabase.from("api_keys").insert({
         key_id: keyId,
-        institution_id: context.institutionId,
-        created_by: context.apiKeyId,
+        institution_id: targetInstitutionId,
+        created_by: creatorId,
         key_hash: `${keyHash}:${saltHex}`,
         key_preview: keyPreview,
         permissions: keyPermissions,
         name: name ?? `API Key - ${environment}`,
         environment,
         expires_at: expiresAt,
+        usage_limit,
         status: "active",
     });
 
     if (insertError) {
         console.error("Failed to insert API key:", insertError);
-        return errorResponse("INTERNAL_ERROR", "Failed to create API key", 500);
+        return errorResponse("INTERNAL_ERROR", `Failed to create API key: ${insertError.message} (${insertError.code})`, 500);
     }
 
     // Return the key — SHOW ONLY ONCE
@@ -173,6 +190,7 @@ async function createApiKey(req: Request): Promise<Response> {
                 environment,
                 permissions: keyPermissions,
                 expires_at: expiresAt,
+                usage_limit,
             },
             meta: {
                 request_id: `req_${crypto.randomUUID().slice(0, 12)}`,
@@ -247,7 +265,7 @@ async function revokeApiKey(
         return errorResponse("NOT_FOUND", "API key not found", 404);
     }
 
-    if (existingKey.institution_id !== context.institutionId) {
+    if (!context.isAdmin && existingKey.institution_id !== context.institutionId) {
         return errorResponse(
             "FORBIDDEN",
             "You can only revoke keys belonging to your institution",
@@ -264,18 +282,21 @@ async function revokeApiKey(
         // No body is fine
     }
 
+    const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const revokerId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
     const { error: updateError } = await supabase
         .from("api_keys")
         .update({
             status: "revoked",
             revoked_at: new Date().toISOString(),
             revoked_reason: reason,
-            revoked_by: context.apiKeyId,
+            revoked_by: revokerId,
         })
         .eq("id", existingKey.id);
 
     if (updateError) {
-        return errorResponse("INTERNAL_ERROR", "Failed to revoke API key", 500);
+        return errorResponse("INTERNAL_ERROR", `Failed to revoke API key: ${updateError.message} (${updateError.code})`, 500);
     }
 
     return successResponse({ key_id: keyId, status: "revoked" });

@@ -16,7 +16,18 @@ Deno.serve(async (req: Request) => {
     if (corsResponse) return corsResponse;
 
     const url = new URL(req.url);
-    const path = url.pathname.replace(/^\/verify/, "");
+    const pathSegments = url.pathname.split("/").filter(Boolean);
+
+    // Normalize path: ignore /functions/v1 prefix if present, then ignore the function name
+    let segments = [...pathSegments];
+    if (segments[0] === "functions" && segments[1] === "v1") {
+        segments = segments.slice(2);
+    }
+    if (segments[0] === "verify") {
+        segments = segments.slice(1);
+    }
+
+    const path = segments.length === 0 ? "" : `/${segments.join("/")}`;
 
     try {
         // GET /verify/:fingerprint_id — Single document verification (public)

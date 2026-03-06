@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 permissions: result.permissions,
                 environment: result.environment,
             });
-        } catch {
+        } catch (err) {
             setApiKey(null);
             setState({
                 isAuthenticated: false,
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 permissions: {},
                 environment: 'test',
             });
-            throw new Error('Invalid API key');
+            throw err instanceof Error ? err : new Error('Invalid API key');
         }
     }
 

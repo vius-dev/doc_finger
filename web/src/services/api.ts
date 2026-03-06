@@ -127,6 +127,7 @@ export interface Document {
     expiry_date: string;
     status: string;
     created_at: string;
+    recipient_additional?: string[];
 }
 
 export interface DocumentDetail extends Document {

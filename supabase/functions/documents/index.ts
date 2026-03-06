@@ -15,12 +15,25 @@ import { authenticateRequest, hasPermission } from "../_shared/auth.ts";
 import { getCachedResponse, saveIdempotentResponse } from "../_shared/idempotency.ts";
 
 
+const isUuid = (id?: string) => !!(id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+
 Deno.serve(async (req: Request) => {
     const corsResponse = handleCors(req);
     if (corsResponse) return corsResponse;
 
     const url = new URL(req.url);
-    const path = url.pathname.replace(/^\/documents/, "");
+    const pathSegments = url.pathname.split("/").filter(Boolean);
+
+    // Normalize path: ignore /functions/v1 prefix if present, then ignore the function name
+    let segments = [...pathSegments];
+    if (segments[0] === "functions" && segments[1] === "v1") {
+        segments = segments.slice(2);
+    }
+    if (segments[0] === "documents") {
+        segments = segments.slice(1);
+    }
+
+    const path = segments.length === 0 ? "" : `/${segments.join("/")}`;
 
     try {
         if (req.method === "POST" && (path === "" || path === "/")) {
@@ -192,18 +205,19 @@ async function registerDocument(req: Request): Promise<Response> {
         metadata: body.metadata ?? {},
     });
 
-    // Extract recipient identity for hashing and storage
-    const recipientIdentity = {
-        email: body.recipient_email || null,
-        phone: body.recipient_phone || null,
-        id_type: body.recipient_id_type || null,
-        id_value: body.recipient_id_value || null,
-    };
+    // Extract recipient identity for hashing and storage as TEXT[]
+    const recipientIdentityStrings = [];
+    if (body.recipient_email) recipientIdentityStrings.push(`email:${body.recipient_email}`);
+    if (body.recipient_phone) recipientIdentityStrings.push(`phone:${body.recipient_phone}`);
+    if (body.recipient_id_type && body.recipient_id_value) recipientIdentityStrings.push(`${body.recipient_id_type}:${body.recipient_id_value}`);
 
     const recipientIdentifierSource = body.recipient_id_value || body.recipient_email || body.recipient_name;
     const recipientIdentifierHash = await sha256(recipientIdentifierSource);
 
-    // Insert document — the set_default_expiry trigger handles expiry_date if still null
+    // Handle creator ID (must be a valid UUID or null)
+    const creatorId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
+    // Insert document
     const { data, error } = await supabase
         .from("documents")
         .insert({
@@ -212,13 +226,13 @@ async function registerDocument(req: Request): Promise<Response> {
             institution_id: context.institutionId,
             template_id: template?.id || null,
             issuing_department: body.issuing_department ?? null,
-            issuer_user_id: body.issuer_user_id ?? null,
+            issuer_user_id: creatorId,
             document_type: template?.document_type || body.document_type,
             document_subtype: template?.document_subtype || body.document_subtype || null,
             document_number: docNumber,
             recipient_name: body.recipient_name,
             recipient_identifier_hash: recipientIdentifierHash,
-            recipient_additional: recipientIdentity,
+            recipient_additional: recipientIdentityStrings.length > 0 ? recipientIdentityStrings : null,
             issue_date: issueDate,
             expiry_date: expiryDate,
             effective_date: body.effective_date ?? null,
@@ -243,6 +257,18 @@ async function registerDocument(req: Request): Promise<Response> {
             "Failed to register document",
             500
         );
+    }
+
+    // Increment API key usage if not an admin JWT
+    if (context.apiKeyId && !context.isAdmin) {
+        const { error: rpcError } = await supabase.rpc("increment_api_key_usage", {
+            p_key_id: context.apiKeyId,
+        });
+        
+        if (rpcError) {
+            console.error("Failed to increment API key usage limit:", rpcError);
+            // We don't block the document response, but it will expire the key if limit hit
+        }
     }
 
     const responseData = {
@@ -289,10 +315,10 @@ async function getDocument(
     }
 
     const supabase = getSupabaseAdmin();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id);
+    const isDocUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id);
 
-    let query = supabase.from("documents").select("*");
-    if (isUuid) {
+    let query = supabase.from("documents").select("*, institution:institutions(legal_name, institution_code)");
+    if (isDocUuid) {
         query = query.eq("id", id);
     } else {
         query = query.eq("fingerprint_id", id.toUpperCase());
@@ -385,12 +411,12 @@ async function revokeDocument(
     const supabase = getSupabaseAdmin();
 
     // Find the document
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id);
+    const isDocUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id);
     let findQuery = supabase
         .from("documents")
         .select("id, institution_id, status");
 
-    if (isUuid) {
+    if (isDocUuid) {
         findQuery = findQuery.eq("id", id);
     } else {
         findQuery = findQuery.eq("fingerprint_id", id.toUpperCase());
@@ -427,13 +453,15 @@ async function revokeDocument(
         // No body is fine
     }
 
+    const revokerId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
     const { error: updateError } = await supabase
         .from("documents")
         .update({
             status: "revoked",
             revoked_at: new Date().toISOString(),
             revoked_reason: reason,
-            revoked_by: context.apiKeyId,
+            revoked_by: revokerId,
         })
         .eq("id", doc.id);
 

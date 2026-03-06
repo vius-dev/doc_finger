@@ -14,6 +14,14 @@ export function useExportPDF() {
         if (!element) return;
 
         setExporting(true);
+        // Force element to be visible and in normal flow for html2canvas
+        const originalStyle = element.getAttribute('style') || '';
+        element.style.display = 'block';
+        element.style.position = 'absolute';
+        element.style.top = '0';
+        element.style.left = '0';
+        element.style.zIndex = '-9999';
+
         try {
             const canvas = await html2canvas(element, {
                 scale: options.scale || 2,
@@ -39,6 +47,8 @@ export function useExportPDF() {
             console.error('PDF generation failed', err);
             throw err;
         } finally {
+            // Restore original styles
+            element.setAttribute('style', originalStyle);
             setExporting(false);
         }
     };

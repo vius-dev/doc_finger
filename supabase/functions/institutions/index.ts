@@ -24,9 +24,19 @@ Deno.serve(async (req: Request) => {
     if (corsResponse) return corsResponse;
 
     const url = new URL(req.url);
-    const path = url.pathname.replace(/^\/institutions/, "");
+    // Find the path relative to the function name
+    const pathParts = url.pathname.split('/');
+    const functionIndex = pathParts.findIndex(p => p === 'institutions');
+    const path = '/' + pathParts.slice(functionIndex + 1).filter(Boolean).join('/');
+
+    console.log(`[INSTITUTIONS] Request: ${req.method} ${url.pathname} -> Path: ${path}`);
 
     try {
+        // Debug endpoint
+        if (req.method === "GET" && path === "/debug") {
+            return successResponse({ message: "Gateway OK - Function reached" });
+        }
+
         // Public endpoints
         if (req.method === "GET" && path.startsWith("/public/")) {
             const code = path.replace("/public/", "");
@@ -54,6 +64,9 @@ Deno.serve(async (req: Request) => {
         }
         if (req.method === "GET" && (path === "" || path === "/")) {
             return await listInstitutions(req);
+        }
+        if (req.method === "POST" && (path === "" || path === "/")) {
+            return await createInstitution(req);
         }
         if (req.method === "PATCH" && path && path !== "/") {
             const id = path.replace("/", "");
@@ -136,6 +149,10 @@ async function createInstitution(req: Request): Promise<Response> {
         );
     }
 
+    // Handle creator ID (must be a valid UUID or null)
+    const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const creatorId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
         .from("institutions")
@@ -156,7 +173,7 @@ async function createInstitution(req: Request): Promise<Response> {
             allowed_document_types: body.allowed_document_types ?? [],
             billing_plan: body.billing_plan ?? "free",
             status: "pending",
-            created_by: context.apiKeyId,
+            created_by: creatorId,
         })
         .select()
         .single();
@@ -170,7 +187,7 @@ async function createInstitution(req: Request): Promise<Response> {
             );
         }
         console.error("Failed to create institution:", error);
-        return errorResponse("INTERNAL_ERROR", "Failed to create institution", 500);
+        return errorResponse("INTERNAL_ERROR", `Failed to create institution: ${error.message} (${error.code})`, 500);
     }
 
     return successResponse(data, undefined, 201);
@@ -332,7 +349,10 @@ async function updateInstitution(
         "tags",
     ];
 
-    const updates: Record<string, unknown> = { updated_by: context.apiKeyId };
+    const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const updaterId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
+    const updates: Record<string, unknown> = { updated_by: updaterId };
     for (const field of allowedFields) {
         if (body[field] !== undefined) {
             updates[field] = body[field];
@@ -457,6 +477,9 @@ async function createTemplate(req: Request): Promise<Response> {
         return errorResponse("VALIDATION_ERROR", "Name and document_type are required", 400);
     }
 
+    const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const creatorId = isUuid(context.userId) ? context.userId : (isUuid(context.apiKeyId) ? context.apiKeyId : null);
+
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
         .from("document_templates")
@@ -471,7 +494,7 @@ async function createTemplate(req: Request): Promise<Response> {
             default_expiry_days: body.default_expiry_days,
             grace_period_days: body.grace_period_days,
             theme_config: body.theme_config ?? {},
-            created_by: context.apiKeyId,
+            created_by: creatorId,
         })
         .select()
         .single();
